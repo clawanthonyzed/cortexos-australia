@@ -255,7 +255,7 @@ export function WorkflowBuilder({ workflow }: WorkflowBuilderProps) {
             onInit={setRfInstance}
             onDrop={onDrop}
             onDragOver={onDragOver}
-            nodeTypes={nodeTypes as Record<string, React.ComponentType<NodeProps>>}
+            nodeTypes={nodeTypes as any}
             onNodeClick={(_, node) => {
               setSelectedNode(node as unknown as WorkflowNode);
               setShowNodeConfig(true);
@@ -408,7 +408,3 @@ export function WorkflowBuilder({ workflow }: WorkflowBuilderProps) {
   );
 }
 
-type NodeProps = {
-  data: WorkflowNodeData;
-  selected: boolean;
-};
