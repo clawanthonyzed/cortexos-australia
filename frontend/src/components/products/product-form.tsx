@@ -124,7 +124,7 @@ export function ProductForm({ open, onClose, onSuccess, existing }: ProductFormP
             <div className="space-y-1.5">
               <Label className="text-sm text-cortex-text">Type</Label>
               <Select
-                defaultValue={existing?.product_type ?? "digital_download"}
+                defaultValue={existing?.type ?? "digital_download"}
                 onValueChange={(v) => setValue("product_type", v as ProductFormValues["product_type"])}
               >
                 <SelectTrigger className="bg-cortex-bg border-cortex-border">
