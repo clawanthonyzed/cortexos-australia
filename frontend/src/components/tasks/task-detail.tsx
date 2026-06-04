@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { StatusDot } from "@/components/ui/status-dot";
 import { formatDistanceToNow, format } from "date-fns";
-import { RotateCcw, XCircle, Clock, Hash, Cpu } from "lucide-react";
+import { RotateCcw, XCircle, Cpu } from "lucide-react";
 import type { Task } from "@/types/task";
 import { api } from "@/lib/api";
 import { useState } from "react";
@@ -19,11 +19,12 @@ interface TaskDetailProps {
 }
 
 const STATUS_DOT_MAP: Record<string, "idle" | "running" | "paused" | "error" | "stopped" | "active" | "draft" | "archived"> = {
-  pending: "idle",
+  queued: "idle",
   running: "running",
   completed: "active",
   failed: "error",
   cancelled: "stopped",
+  paused: "paused",
 };
 
 function MetaRow({ label, value }: { label: string; value: React.ReactNode }) {
@@ -60,7 +61,7 @@ export function TaskDetail({ task, open, onClose, onUpdated }: TaskDetailProps) 
     }
   };
 
-  const canCancel = ["pending", "running"].includes(task.status);
+  const canCancel = ["queued", "running"].includes(task.status);
   const canRetry = ["failed", "cancelled"].includes(task.status);
 
   return (
@@ -81,7 +82,7 @@ export function TaskDetail({ task, open, onClose, onUpdated }: TaskDetailProps) 
               <span className="text-sm capitalize text-cortex-text">{task.status}</span>
             </div>
             <Badge variant="outline" className="border-cortex-border text-cortex-muted text-xs">
-              Priority {task.priority}
+              {task.priority}
             </Badge>
           </div>
 
@@ -97,55 +98,56 @@ export function TaskDetail({ task, open, onClose, onUpdated }: TaskDetailProps) 
             <MetaRow label="Task ID" value={
               <span className="font-mono text-cortex-muted">{task.id.slice(0, 8)}…</span>
             } />
-            {task.agent_id && (
+            {task.agentId && (
               <MetaRow label="Agent" value={
                 <span className="flex items-center gap-1">
                   <Cpu className="h-3 w-3 text-cortex-accent" />
-                  {task.agent_id.slice(0, 8)}…
+                  {task.agentName ?? task.agentId.slice(0, 8) + "…"}
                 </span>
               } />
             )}
             <MetaRow label="Created" value={
-              formatDistanceToNow(new Date(task.created_at), { addSuffix: true })
+              formatDistanceToNow(new Date(task.createdAt), { addSuffix: true })
             } />
-            {task.started_at && (
+            {task.startedAt && (
               <MetaRow
                 label="Started"
-                value={format(new Date(task.started_at), "MMM d, HH:mm:ss")}
+                value={format(new Date(task.startedAt), "MMM d, HH:mm:ss")}
               />
             )}
-            {task.completed_at && (
+            {task.completedAt && (
               <MetaRow
                 label="Completed"
-                value={format(new Date(task.completed_at), "MMM d, HH:mm:ss")}
+                value={format(new Date(task.completedAt), "MMM d, HH:mm:ss")}
               />
             )}
-            {task.scheduled_at && (
+            {task.durationMs && (
               <MetaRow
-                label="Scheduled"
-                value={format(new Date(task.scheduled_at), "MMM d, HH:mm")}
+                label="Duration"
+                value={`${(task.durationMs / 1000).toFixed(1)}s`}
               />
             )}
-            <MetaRow label="Retries" value={`${task.retry_count ?? 0} / ${task.max_retries ?? 3}`} />
+            <MetaRow label="Tokens" value={task.tokensUsed.toLocaleString()} />
+            <MetaRow label="Cost" value={`$${task.costUsd.toFixed(4)}`} />
           </div>
 
-          {/* Result */}
-          {task.result_json && (
+          {/* Output */}
+          {task.output && Object.keys(task.output).length > 0 && (
             <>
               <Separator className="bg-cortex-border" />
               <div>
                 <p className="text-xs font-medium text-cortex-muted uppercase tracking-wider mb-2">
-                  Result
+                  Output
                 </p>
                 <pre className="text-xs text-cortex-text bg-cortex-bg rounded-md p-3 overflow-auto max-h-48 border border-cortex-border">
-                  {JSON.stringify(JSON.parse(task.result_json), null, 2)}
+                  {JSON.stringify(task.output, null, 2)}
                 </pre>
               </div>
             </>
           )}
 
           {/* Error */}
-          {task.error_message && (
+          {task.errorMessage && (
             <>
               <Separator className="bg-cortex-border" />
               <div>
@@ -153,7 +155,7 @@ export function TaskDetail({ task, open, onClose, onUpdated }: TaskDetailProps) 
                   Error
                 </p>
                 <div className="text-xs text-red-300 bg-red-950/30 rounded-md p-3 border border-red-900/40">
-                  {task.error_message}
+                  {task.errorMessage}
                 </div>
               </div>
             </>
