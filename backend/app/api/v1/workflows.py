@@ -197,7 +197,7 @@ async def update_workflow(
     return WorkflowRead.model_validate(workflow)
 
 
-@router.delete("/{workflow_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["workflows"])
+@router.delete("/{workflow_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None, tags=["workflows"])
 async def delete_workflow(
     workflow_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),

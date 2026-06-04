@@ -133,7 +133,7 @@ async def update_task(
     return TaskRead.model_validate(task)
 
 
-@router.delete("/{task_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["tasks"])
+@router.delete("/{task_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None, tags=["tasks"])
 async def delete_task(
     task_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),

@@ -137,7 +137,7 @@ async def update_agent(
     return AgentRead.model_validate(agent)
 
 
-@router.delete("/{agent_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["agents"])
+@router.delete("/{agent_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None, tags=["agents"])
 async def delete_agent(
     agent_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),

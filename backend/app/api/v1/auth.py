@@ -194,7 +194,7 @@ async def refresh_token(
     )
 
 
-@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT, tags=["auth"])
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT, response_model=None, tags=["auth"])
 async def logout(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),

@@ -186,7 +186,7 @@ async def get_memory(
     return _item_to_schema(item)
 
 
-@router.delete("/{memory_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["memory"])
+@router.delete("/{memory_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None, tags=["memory"])
 async def delete_memory(
     memory_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
@@ -202,7 +202,7 @@ async def delete_memory(
     await db.delete(item)
 
 
-@router.delete("/agent/{agent_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["memory"])
+@router.delete("/agent/{agent_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None, tags=["memory"])
 async def prune_agent_memory(
     agent_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
