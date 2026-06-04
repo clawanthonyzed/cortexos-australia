@@ -18,7 +18,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import type { Product } from "@/types/product";
-import api from "@/lib/api";
+import { api } from "@/lib/api";
 
 const productSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters").max(200),
@@ -64,8 +64,8 @@ export function ProductForm({ open, onClose, onSuccess, existing }: ProductFormP
       ? {
           name: existing.name,
           description: existing.description,
-          product_type: existing.product_type,
-          price_aud: existing.price_aud,
+          product_type: existing.type as ProductFormValues["product_type"],
+          price_aud: existing.priceAud,
           tags: existing.tags?.join(", ") ?? "",
         }
       : {

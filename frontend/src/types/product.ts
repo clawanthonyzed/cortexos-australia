@@ -1,6 +1,17 @@
 export type ProductStatus = "draft" | "active" | "paused" | "archived";
 export type ProductPlatform = "gumroad" | "lemonsqueezy" | "etsy" | "shopify" | "direct";
-export type ProductType = "digital_download" | "subscription" | "physical" | "service" | "template";
+export type ProductType =
+  | "digital_download"
+  | "course"
+  | "template"
+  | "prompt_pack"
+  | "ebook"
+  | "automation"
+  | "ai_asset"
+  | "subscription"
+  | "physical"
+  | "service"
+  | "other";
 
 export interface ProductSalesData {
   date: string;

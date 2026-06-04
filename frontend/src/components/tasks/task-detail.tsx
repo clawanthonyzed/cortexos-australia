@@ -8,7 +8,7 @@ import { StatusDot } from "@/components/ui/status-dot";
 import { formatDistanceToNow, format } from "date-fns";
 import { RotateCcw, XCircle, Clock, Hash, Cpu } from "lucide-react";
 import type { Task } from "@/types/task";
-import api from "@/lib/api";
+import { api } from "@/lib/api";
 import { useState } from "react";
 
 interface TaskDetailProps {
