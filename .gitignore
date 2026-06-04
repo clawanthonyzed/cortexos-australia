@@ -19,8 +19,9 @@ var/
 sdist/
 develop-eggs/
 .installed.cfg
-lib/
-lib64/
+# lib/ and lib64/ are Python virtualenv dirs — only ignore at root level
+/lib/
+/lib64/
 wheels/
 
 # Virtual environments
