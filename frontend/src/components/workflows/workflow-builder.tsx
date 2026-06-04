@@ -10,6 +10,7 @@ import ReactFlow, {
   useEdgesState,
   type Connection,
   type ReactFlowInstance,
+  type NodeProps,
   BackgroundVariant,
   MarkerType,
 } from "reactflow";
