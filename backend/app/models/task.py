@@ -13,6 +13,7 @@ from app.database import Base, TimestampMixin, UUIDMixin
 
 if TYPE_CHECKING:
     from app.models.agent import Agent
+    from app.models.workflow import Workflow, WorkflowStep
 
 
 class TaskStatus:
@@ -82,6 +83,8 @@ class Task(Base, UUIDMixin, TimestampMixin):
 
     # Relationships
     agent: Mapped["Agent | None"] = relationship("Agent", back_populates="tasks")
+    workflow: Mapped["Workflow | None"] = relationship("Workflow", back_populates="tasks", foreign_keys=[workflow_id])
+    workflow_step: Mapped["WorkflowStep | None"] = relationship("WorkflowStep", back_populates="tasks", foreign_keys=[workflow_step_id])
     subtasks: Mapped[list["Task"]] = relationship(
         "Task", back_populates="parent_task", foreign_keys=[parent_task_id]
     )
