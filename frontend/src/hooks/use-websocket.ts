@@ -36,14 +36,14 @@ export function useWebSocket() {
       switch (msg.type) {
         case "agent.status_changed":
           updateAgent(msg.payload.id, {
-            status: msg.payload.status as import("@/types/agent").AgentStatus,
+            status: msg.payload.status as unknown as import("@/types/agent").AgentStatus,
             currentTask: msg.payload.currentTask,
           });
           break;
 
         case "agent.metrics_updated":
           updateAgent(msg.payload.id, {
-            metrics: msg.payload.metrics as import("@/types/agent").AgentMetrics,
+            metrics: msg.payload.metrics as unknown as import("@/types/agent").AgentMetrics,
           });
           break;
 
