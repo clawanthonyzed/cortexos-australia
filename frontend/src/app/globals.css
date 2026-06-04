@@ -1,0 +1,147 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+@layer base {
+  :root {
+    --background: 240 10% 4%;
+    --foreground: 240 20% 91%;
+    --card: 240 8% 7%;
+    --card-foreground: 240 20% 91%;
+    --popover: 240 8% 7%;
+    --popover-foreground: 240 20% 91%;
+    --primary: 239 84% 67%;
+    --primary-foreground: 240 10% 4%;
+    --secondary: 240 5% 12%;
+    --secondary-foreground: 240 20% 91%;
+    --muted: 240 5% 14%;
+    --muted-foreground: 240 5% 48%;
+    --accent: 240 5% 14%;
+    --accent-foreground: 240 20% 91%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 240 5% 14%;
+    --input: 240 5% 14%;
+    --ring: 239 84% 67%;
+    --radius: 0.5rem;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    @apply dark;
+  }
+
+  body {
+    @apply bg-cortex-bg text-cortex-text font-sans antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: #0a0a0b;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #1e1e24;
+    border-radius: 3px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #2a2a34;
+  }
+
+  /* React Flow overrides */
+  .react-flow__background {
+    background-color: #0a0a0b !important;
+  }
+
+  .react-flow__minimap {
+    background-color: #111113 !important;
+    border: 1px solid #1e1e24 !important;
+    border-radius: 8px !important;
+  }
+
+  .react-flow__controls {
+    background-color: #111113 !important;
+    border: 1px solid #1e1e24 !important;
+    border-radius: 8px !important;
+  }
+
+  .react-flow__controls-button {
+    background-color: #111113 !important;
+    border-color: #1e1e24 !important;
+    color: #e4e4f0 !important;
+  }
+
+  .react-flow__controls-button:hover {
+    background-color: #1e1e24 !important;
+  }
+}
+
+@layer components {
+  .cortex-surface {
+    @apply bg-cortex-surface border border-cortex-border rounded-lg;
+  }
+
+  .cortex-card {
+    @apply cortex-surface p-4;
+  }
+
+  .cortex-card-hover {
+    @apply cortex-card transition-colors duration-150 hover:border-cortex-accent/40 hover:bg-[#14141a];
+  }
+
+  .status-pulse-green {
+    @apply relative inline-flex h-2.5 w-2.5;
+  }
+
+  .status-pulse-green::before {
+    @apply absolute inline-flex h-full w-full rounded-full bg-cortex-success opacity-75 animate-ping content-[''];
+  }
+
+  .mono {
+    @apply font-mono text-sm tracking-tight;
+  }
+
+  .label-sm {
+    @apply text-xs font-medium uppercase tracking-widest text-cortex-muted;
+  }
+
+  .section-header {
+    @apply flex items-center justify-between mb-4;
+  }
+
+  .page-title {
+    @apply text-2xl font-semibold text-cortex-text tracking-tight;
+  }
+
+  .skeleton-pulse {
+    @apply animate-pulse bg-cortex-border rounded;
+  }
+}
+
+@layer utilities {
+  .text-gradient-accent {
+    @apply bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent;
+  }
+
+  .border-accent-glow {
+    box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.3), 0 0 20px rgba(99, 102, 241, 0.1);
+  }
+
+  .grid-bg {
+    background-image: linear-gradient(rgba(99, 102, 241, 0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(99, 102, 241, 0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+}

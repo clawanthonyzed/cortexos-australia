@@ -1,0 +1,85 @@
+# Traefik Dynamic Configuration
+# CortexOS — Middlewares and routing rules
+
+http:
+  middlewares:
+    # HTTPS redirect (applied at entrypoint level in traefik.yml, kept here for reference)
+    https-redirect:
+      redirectScheme:
+        scheme: https
+        permanent: true
+
+    # Security headers — OWASP recommended set
+    auth-headers:
+      headers:
+        sslRedirect: true
+        forceSTSHeader: true
+        stsIncludeSubdomains: true
+        stsPreload: true
+        stsSeconds: 31536000
+        contentTypeNosniff: true
+        browserXssFilter: true
+        referrerPolicy: "strict-origin-when-cross-origin"
+        permissionsPolicy: "camera=(), microphone=(), geolocation=(), payment=()"
+        customFrameOptionsValue: "SAMEORIGIN"
+        contentSecurityPolicy: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' wss: https:; font-src 'self' data:;"
+        customResponseHeaders:
+          X-Powered-By: ""
+          Server: ""
+
+    # Rate limiting — protects API and auth endpoints
+    rate-limit:
+      rateLimit:
+        average: 100
+        burst: 50
+        period: 1s
+        sourceCriterion:
+          ipStrategy:
+            depth: 1
+
+    # Stricter rate limit for auth endpoints
+    rate-limit-auth:
+      rateLimit:
+        average: 10
+        burst: 5
+        period: 1m
+        sourceCriterion:
+          ipStrategy:
+            depth: 1
+
+    # Compress responses
+    compress:
+      compress:
+        excludedContentTypes:
+          - text/event-stream
+
+    # Strip /api prefix if needed for certain routes
+    strip-api-prefix:
+      stripPrefix:
+        prefixes:
+          - "/api"
+
+  # Routers defined here as fallback (primary routing via Docker labels)
+  routers:
+    # Catch-all HTTP to HTTPS redirect
+    http-catchall:
+      rule: "hostregexp(`{host:.+}`)"
+      entrypoints:
+        - web
+      middlewares:
+        - https-redirect
+      service: noop@internal
+
+# TLS configuration
+tls:
+  options:
+    default:
+      minVersion: VersionTLS12
+      cipherSuites:
+        - TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
+        - TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+        - TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
+        - TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+        - TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305
+        - TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305
+      sniStrict: true
