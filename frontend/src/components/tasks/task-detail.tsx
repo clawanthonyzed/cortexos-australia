@@ -18,12 +18,12 @@ interface TaskDetailProps {
   onUpdated: (task: Task) => void;
 }
 
-const STATUS_COLORS: Record<string, "green" | "yellow" | "red" | "gray" | "blue"> = {
-  pending: "yellow",
-  running: "blue",
-  completed: "green",
-  failed: "red",
-  cancelled: "gray",
+const STATUS_DOT_MAP: Record<string, "idle" | "running" | "paused" | "error" | "stopped" | "active" | "draft" | "archived"> = {
+  pending: "idle",
+  running: "running",
+  completed: "active",
+  failed: "error",
+  cancelled: "stopped",
 };
 
 function MetaRow({ label, value }: { label: string; value: React.ReactNode }) {
@@ -77,7 +77,7 @@ export function TaskDetail({ task, open, onClose, onUpdated }: TaskDetailProps) 
           {/* Status + priority */}
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-1.5">
-              <StatusDot color={STATUS_COLORS[task.status] ?? "gray"} />
+              <StatusDot status={STATUS_DOT_MAP[task.status] ?? "idle"} />
               <span className="text-sm capitalize text-cortex-text">{task.status}</span>
             </div>
             <Badge variant="outline" className="border-cortex-border text-cortex-muted text-xs">
