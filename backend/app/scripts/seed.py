@@ -129,16 +129,19 @@ async def seed() -> None:
             admin_role_result = await db.execute(select(Role).where(Role.name == "admin"))
             admin_role = admin_role_result.scalar_one_or_none()
 
+            from app.models.user import UserRole
             admin = User(
                 email="admin@cortexos.ai",
+                username="admin",
                 hashed_password=hash_password("cortexos-admin-change-me"),
                 full_name="CortexOS Admin",
                 is_active=True,
-                is_superuser=True,
+                is_verified=True,
             )
-            if admin_role:
-                admin.roles.append(admin_role)
             db.add(admin)
+            await db.flush()
+            if admin_role:
+                db.add(UserRole(user_id=admin.id, role_id=admin_role.id))
             await db.commit()
             logger.info("Created admin user", email="admin@cortexos.ai")
         else:
