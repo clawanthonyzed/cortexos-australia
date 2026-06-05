@@ -1,7 +1,10 @@
+"use client";
+
 import type { LucideIcon } from "lucide-react";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useEffect, useRef, useState } from "react";
 
 interface StatCardProps {
   title: string;
@@ -34,6 +37,16 @@ export function StatCard({
   isLoading,
   subtitle,
 }: StatCardProps) {
+  const [animKey, setAnimKey] = useState(0);
+  const prevValue = useRef(value);
+
+  useEffect(() => {
+    if (prevValue.current !== value) {
+      prevValue.current = value;
+      setAnimKey((k) => k + 1);
+    }
+  }, [value]);
+
   if (isLoading) {
     return (
       <div className="rounded-lg border border-cortex-border bg-cortex-surface p-4">
@@ -57,7 +70,22 @@ export function StatCard({
           <Icon className="h-4.5 w-4.5" aria-hidden="true" />
         </div>
       </div>
-      <p className="mb-1 text-2xl font-bold text-cortex-text font-mono tracking-tight">{value}</p>
+      <p
+        key={animKey}
+        className="mb-1 text-2xl font-bold text-cortex-text font-mono tracking-tight t-digit-group is-animating"
+      >
+        {String(value).split("").map((ch, i, arr) => (
+          <span
+            key={i}
+            className="t-digit"
+            data-stagger={
+              i === arr.length - 2 ? "1" : i === arr.length - 1 ? "2" : undefined
+            }
+          >
+            {ch}
+          </span>
+        ))}
+      </p>
       <div className="flex items-center gap-1.5">
         {effectiveTrend !== undefined && delta !== undefined && (
           <>

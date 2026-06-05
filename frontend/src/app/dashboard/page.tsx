@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import {
   Bot, DollarSign, ListChecks, Cpu, Activity, TrendingUp
 } from "lucide-react";
@@ -24,13 +25,19 @@ export default function DashboardPage() {
   const { data: tasksData, isLoading: tasksLoading } = useTasks({ pageSize: 10 });
   const { health } = useSystemStore();
 
+  const [titleShown, setTitleShown] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setTitleShown(true), 80);
+    return () => clearTimeout(t);
+  }, []);
+
   return (
     <AppShell>
       <div className="space-y-6">
         {/* Page title */}
-        <div>
-          <h1 className="page-title">Command Center</h1>
-          <p className="text-sm text-cortex-muted mt-0.5">Live system overview</p>
+        <div className={`t-stagger${titleShown ? " is-shown" : ""}`}>
+          <h1 className="t-stagger-line t-stagger-line--1 page-title">Command Center</h1>
+          <p className="t-stagger-line t-stagger-line--2 text-sm text-cortex-muted mt-0.5">Live system overview</p>
         </div>
 
         {/* KPI Cards */}

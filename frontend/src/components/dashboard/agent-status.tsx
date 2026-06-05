@@ -74,9 +74,18 @@ export function AgentStatusWidget({ agents, isLoading }: AgentStatusWidgetProps)
               {agent.name}
             </p>
             <p className="text-[11px] text-cortex-muted truncate">
-              {agent.currentTask
-                ? truncate(agent.currentTask, 42)
-                : agent.purpose}
+              {agent.status === "running" && agent.currentTask ? (
+                <span
+                  className="t-shimmer"
+                  data-text={truncate(agent.currentTask, 42)}
+                >
+                  {truncate(agent.currentTask, 42)}
+                </span>
+              ) : agent.currentTask ? (
+                truncate(agent.currentTask, 42)
+              ) : (
+                agent.purpose
+              )}
             </p>
           </div>
 
