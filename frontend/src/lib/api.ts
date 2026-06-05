@@ -79,15 +79,15 @@ api.interceptors.response.use(
 
       try {
         const { data } = await axios.post<{
-          accessToken: string;
-          refreshToken: string;
-        }>(`${BASE_URL}/auth/refresh`, { refreshToken });
+          access_token: string;
+          refresh_token: string;
+        }>(`${BASE_URL}/auth/refresh`, { refresh_token: refreshToken });
 
-        setTokens(data.accessToken, data.refreshToken);
-        processQueue(null, data.accessToken);
+        setTokens(data.access_token, data.refresh_token);
+        processQueue(null, data.access_token);
 
         if (originalRequest.headers) {
-          originalRequest.headers.Authorization = `Bearer ${data.accessToken}`;
+          originalRequest.headers.Authorization = `Bearer ${data.access_token}`;
         }
         return api(originalRequest);
       } catch (refreshError) {

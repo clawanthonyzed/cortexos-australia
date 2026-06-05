@@ -159,17 +159,17 @@ export function TopBar() {
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" size="sm" className="gap-2 h-7 px-2">
             <div className="flex h-5 w-5 items-center justify-center rounded-full bg-cortex-accent text-[10px] font-bold text-white flex-shrink-0">
-              {user?.name?.[0]?.toUpperCase() ?? "U"}
+              {(user?.full_name ?? user?.username)?.[0]?.toUpperCase() ?? "U"}
             </div>
             <span className="hidden sm:block text-xs text-cortex-text max-w-[100px] truncate">
-              {user?.name ?? "User"}
+              {user?.full_name ?? user?.username ?? "User"}
             </span>
             <ChevronDown className="h-3.5 w-3.5 text-cortex-muted" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-48">
           <DropdownMenuLabel>
-            <p className="text-xs font-medium">{user?.name}</p>
+            <p className="text-xs font-medium">{user?.full_name ?? user?.username}</p>
             <p className="text-[10px] text-cortex-muted">{user?.email}</p>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
