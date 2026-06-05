@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.database import AsyncSessionLocal
-from app.models.user import User
+from app.models.user import User, UserRole
 
 _bearer = HTTPBearer(auto_error=True)
 
@@ -58,7 +58,7 @@ async def get_current_user(
     result = await db.execute(
         select(User)
         .where(User.id == user_id)
-        .options(selectinload(User.user_roles).selectinload("role"))
+        .options(selectinload(User.user_roles).selectinload(UserRole.role))
     )
     user = result.scalar_one_or_none()
 
