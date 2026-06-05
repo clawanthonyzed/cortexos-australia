@@ -22,11 +22,13 @@ interface TaskRowProps {
 
 const statusConfig: Record<Task["status"], { icon: React.ElementType; color: string; label: string }> = {
   queued: { icon: Clock, color: "text-cortex-muted", label: "Queued" },
+  pending: { icon: Clock, color: "text-cortex-muted", label: "Pending" },
   running: { icon: Loader2, color: "text-cortex-accent", label: "Running" },
   completed: { icon: CheckCircle2, color: "text-cortex-success", label: "Completed" },
   failed: { icon: XCircle, color: "text-cortex-error", label: "Failed" },
   cancelled: { icon: StopCircle, color: "text-cortex-muted", label: "Cancelled" },
   paused: { icon: Pause, color: "text-cortex-warning", label: "Paused" },
+  retrying: { icon: Loader2, color: "text-cortex-warning", label: "Retrying" },
 };
 
 const priorityVariant = {

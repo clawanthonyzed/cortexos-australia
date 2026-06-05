@@ -1,10 +1,12 @@
 export type TaskStatus =
   | "queued"
+  | "pending"
   | "running"
   | "completed"
   | "failed"
   | "cancelled"
-  | "paused";
+  | "paused"
+  | "retrying";
 
 export type TaskPriority = "low" | "normal" | "high" | "critical";
 
