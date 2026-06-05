@@ -34,10 +34,26 @@ class Mem0Client:
             elif not settings.mem0_use_local:
                 logger.warning("No MEM0_API_KEY set and local mode disabled — memory disabled")
             else:
-                # Local mode using built-in Qdrant + OpenAI embeddings
+                # Local mode: Qdrant vector store + Ollama embeddings (no OpenAI key needed)
                 from mem0 import Memory  # type: ignore[import]
-                self._client = Memory()
-                logger.info("Mem0 local client initialised")
+                mem0_config = {
+                    "embedder": {
+                        "provider": "ollama",
+                        "config": {
+                            "model": settings.mem0_embed_model,
+                            "ollama_base_url": settings.mem0_ollama_url,
+                        },
+                    },
+                    "llm": {
+                        "provider": "anthropic",
+                        "config": {
+                            "model": "claude-haiku-4-5-20251001",
+                            "api_key": settings.anthropic_api_key,
+                        },
+                    },
+                }
+                self._client = Memory.from_config(mem0_config)
+                logger.info("Mem0 local client initialised", embed_model=settings.mem0_embed_model)
         except ImportError:
             logger.warning("mem0ai not installed — memory disabled")
         except Exception as exc:
