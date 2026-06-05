@@ -16,5 +16,8 @@
     "ui": "@/components/ui",
     "lib": "@/lib",
     "hooks": "@/hooks"
+  },
+  "registries": {
+    "@efferd": "https://efferd.com/r/{style}/{name}.json"
   }
 }

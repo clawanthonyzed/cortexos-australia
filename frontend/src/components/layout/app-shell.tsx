@@ -2,10 +2,11 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Sidebar } from "./sidebar";
-import { TopBar } from "./topbar";
 import { useAuthStore } from "@/store/auth-store";
 import { useWebSocket } from "@/hooks/use-websocket";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { AppHeader } from "@/components/app-header";
+import { AppSidebar } from "@/components/app-sidebar";
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -21,7 +22,6 @@ export function AppShell({ children }: AppShellProps) {
   const router = useRouter();
 
   useEffect(() => {
-    // In dev mode, skip auth gate to allow browsing
     if (process.env.NODE_ENV === "development") return;
     if (!isAuthenticated) {
       router.replace("/login");
@@ -29,17 +29,17 @@ export function AppShell({ children }: AppShellProps) {
   }, [isAuthenticated, router]);
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-cortex-bg">
+    <div className="overflow-hidden">
       <WebSocketInitializer />
-      <Sidebar />
-      <div className="flex flex-1 flex-col min-w-0 overflow-hidden">
-        <TopBar />
-        <main className="flex-1 overflow-y-auto overflow-x-hidden">
-          <div className="mx-auto max-w-[1600px] p-6">
+      <SidebarProvider className="relative h-svh">
+        <AppSidebar />
+        <SidebarInset className="md:peer-data-[variant=inset]:ml-0">
+          <AppHeader />
+          <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4 md:p-6">
             {children}
           </div>
-        </main>
-      </div>
+        </SidebarInset>
+      </SidebarProvider>
     </div>
   );
 }
