@@ -16,6 +16,7 @@ import { useAgents } from "@/hooks/use-agents";
 import { useTasks } from "@/hooks/use-tasks";
 import { useSystemStore } from "@/store/system-store";
 import { formatCurrency, formatTokens, formatPercent } from "@/lib/utils";
+import { tokenUsageToModelCost } from "@/types/finance";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function DashboardPage() {
@@ -127,7 +128,7 @@ export default function DashboardPage() {
                 </div>
               </div>
               <RevenueChart
-                data={financeData?.revenueHistory ?? []}
+                data={financeData?.revenue_history ?? []}
                 isLoading={financeLoading}
               />
             </div>
@@ -172,7 +173,7 @@ export default function DashboardPage() {
                 <span className="text-xs text-cortex-muted">This month</span>
               </div>
               <CostTracker
-                data={financeData?.modelCosts ?? []}
+                data={(financeData?.model_costs ?? []).map(tokenUsageToModelCost)}
                 isLoading={financeLoading}
               />
             </div>
