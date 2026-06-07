@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import uuid
+from datetime import datetime
 from typing import Any
 
 import structlog
@@ -88,6 +89,56 @@ async def create_task(
     await db.flush()
     await db.refresh(task)
     return TaskRead.model_validate(task)
+
+
+@router.get("/stats", response_model=dict[str, Any], tags=["tasks"])
+async def task_stats(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_permission(Permission.TASK_READ)),
+) -> dict[str, Any]:
+    """Queue statistics for dashboard widgets."""
+    from datetime import date, timezone
+    today_start = datetime.combine(date.today(), datetime.min.time()).replace(tzinfo=timezone.utc)
+
+    async def count(where_clause) -> int:
+        result = await db.execute(select(func.count()).select_from(Task).where(where_clause))
+        return result.scalar_one()
+
+    queued = await count(Task.status == TaskStatus.QUEUED)
+    running = await count(Task.status == TaskStatus.RUNNING)
+    completed_today = await count(
+        (Task.status == TaskStatus.COMPLETED) & (Task.completed_at >= today_start)
+    )
+    failed_today = await count(
+        (Task.status == TaskStatus.FAILED) & (Task.completed_at >= today_start)
+    )
+
+    # Average duration of tasks completed today
+    dur_result = await db.execute(
+        select(Task.started_at, Task.completed_at).where(
+            (Task.status == TaskStatus.COMPLETED)
+            & (Task.completed_at >= today_start)
+            & (Task.started_at.is_not(None))
+        )
+    )
+    rows = dur_result.all()
+    avg_duration_ms = 0.0
+    if rows:
+        durations = [
+            (r.completed_at - r.started_at).total_seconds() * 1000
+            for r in rows
+            if r.completed_at and r.started_at
+        ]
+        avg_duration_ms = sum(durations) / len(durations) if durations else 0.0
+
+    return {
+        "queued": queued,
+        "running": running,
+        "completedToday": completed_today,
+        "failedToday": failed_today,
+        "avgDurationMs": round(avg_duration_ms, 2),
+        "totalCostToday": 0.0,
+    }
 
 
 @router.get("/{task_id}", response_model=TaskRead, tags=["tasks"])

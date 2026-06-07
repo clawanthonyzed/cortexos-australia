@@ -33,6 +33,15 @@ class TokenUsageSummary(BaseModel):
     completion_tokens: int
     cost_usd: float
     period: str
+    percent_of_total: float = 0.0
+    request_count: int = 0
+
+
+class RevenueDataPoint(BaseModel):
+    date: str  # ISO date string YYYY-MM-DD
+    revenue: float
+    costs: float
+    profit: float
 
 
 class ForecastPoint(BaseModel):
@@ -62,6 +71,8 @@ class FinanceDashboard(BaseModel):
     token_usage: list[TokenUsageSummary]
     revenue_by_platform: list[RevenueByPlatform]
     monthly_trend: list[MonthlySummary]
+    revenue_history: list[RevenueDataPoint] = []
+    model_costs: list[TokenUsageSummary] = []
 
 
 class CostRecordRead(BaseModel):

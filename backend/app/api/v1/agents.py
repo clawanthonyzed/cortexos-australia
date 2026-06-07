@@ -276,6 +276,51 @@ async def clone_agent(
     return AgentRead.model_validate(cloned)
 
 
+@router.get("/{agent_id}/logs", response_model=dict[str, Any], tags=["agents"])
+async def agent_logs(
+    agent_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_permission(Permission.AGENT_READ)),
+    limit: int = Query(default=100, ge=1, le=500),
+) -> dict[str, Any]:
+    """Return recent task executions for an agent as log entries."""
+    from app.models.task import Task
+
+    result = await db.execute(
+        select(Task)
+        .where(Task.agent_id == agent_id)
+        .order_by(Task.created_at.desc())
+        .limit(limit)
+    )
+    tasks = result.scalars().all()
+
+    logs = []
+    for t in tasks:
+        if t.status == "completed":
+            level, msg = "info", f"Completed: {t.title}"
+        elif t.status == "failed":
+            level, msg = "error", f"Failed: {t.title}" + (f" — {t.error_message}" if t.error_message else "")
+        elif t.status == "running":
+            level, msg = "info", f"Running: {t.title}"
+        elif t.status in ("queued", "pending"):
+            level, msg = "debug", f"Queued: {t.title}"
+        elif t.status == "cancelled":
+            level, msg = "warn", f"Cancelled: {t.title}"
+        else:
+            level, msg = "debug", f"{t.status.capitalize()}: {t.title}"
+
+        logs.append({
+            "id": str(t.id),
+            "agentId": str(agent_id),
+            "level": level,
+            "message": msg,
+            "metadata": {"status": t.status, "priority": t.priority},
+            "timestamp": t.updated_at.isoformat() if t.updated_at else t.created_at.isoformat(),
+        })
+
+    return {"logs": logs, "total": len(logs)}
+
+
 @router.get("/types/list", tags=["agents"])
 async def list_agent_types(
     current_user: User = Depends(require_permission(Permission.AGENT_READ)),

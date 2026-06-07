@@ -1,6 +1,8 @@
 import useSWR, { type SWRConfiguration } from "swr";
-import { fetcher } from "@/lib/api";
+import { useEffect } from "react";
+import { fetcher, healthFetcher } from "@/lib/api";
 import type { FinanceDashboard } from "@/types/finance";
+import { useSystemStore } from "@/store/system-store";
 
 export function useFinance(
   params?: { period?: "7d" | "30d" | "90d" | "1y" },
@@ -14,6 +16,34 @@ export function useFinance(
     refreshInterval: 30000,
     ...config,
   });
+}
+
+interface ReadyResponse {
+  status: string;
+  checks: { database: string; redis: string };
+  uptime_seconds: number;
+}
+
+export function useSystemHealth() {
+  const { setHealth } = useSystemStore();
+  const start = typeof performance !== "undefined" ? performance.now() : 0;
+
+  const { data } = useSWR<ReadyResponse>("/ready", healthFetcher, {
+    refreshInterval: 15000,
+    onSuccess: (d) => {
+      const latency = Math.round(performance.now() - start);
+      setHealth({
+        overallPercent: d.status === "ready" ? 100 : 90,
+        apiLatencyMs: latency,
+        dbHealthy: d.checks.database === "ok",
+        wsHealthy: false,
+        agentServiceHealthy: d.status === "ready",
+        queueDepth: 0,
+        lastCheckedAt: new Date().toISOString(),
+      });
+    },
+  });
+  return data;
 }
 
 export function useDashboardStats(config?: SWRConfiguration) {

@@ -9,9 +9,10 @@ import {
 import { apiClient } from "@/lib/api";
 
 interface LoginResponse {
-  accessToken: string;
-  refreshToken: string;
-  user: AuthUser;
+  access_token: string;
+  refresh_token: string;
+  token_type: string;
+  expires_in: number;
 }
 
 interface AuthState {
@@ -36,13 +37,14 @@ export const useAuthStore = create<AuthState>()(
       login: async (email: string, password: string) => {
         set({ isLoading: true, error: null });
         try {
-          const data = await apiClient.post<LoginResponse>("/auth/login", {
+          const tokens = await apiClient.post<LoginResponse>("/auth/login", {
             email,
             password,
           });
-          setTokens(data.accessToken, data.refreshToken);
-          setStoredUser(data.user);
-          set({ user: data.user, isAuthenticated: true, isLoading: false });
+          setTokens(tokens.access_token, tokens.refresh_token);
+          const user = await apiClient.get<AuthUser>("/auth/me");
+          setStoredUser(user);
+          set({ user, isAuthenticated: true, isLoading: false });
         } catch (err: unknown) {
           const message =
             err instanceof Error ? err.message : "Login failed. Check your credentials.";

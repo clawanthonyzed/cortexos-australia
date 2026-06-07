@@ -112,6 +112,17 @@ export async function fetcher<T>(url: string): Promise<T> {
   return data;
 }
 
+// Fetcher for health/ready endpoints that live at the API root (no /api/v1 prefix)
+const healthApi = axios.create({
+  baseURL: BASE_URL.replace(/\/api\/v1\/?$/, ""),
+  timeout: 10_000,
+});
+
+export async function healthFetcher<T>(url: string): Promise<T> {
+  const { data } = await healthApi.get<T>(url);
+  return data;
+}
+
 // Typed API helpers
 export const apiClient = {
   get: <T>(url: string, params?: Record<string, unknown>) =>

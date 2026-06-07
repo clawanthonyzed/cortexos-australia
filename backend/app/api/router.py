@@ -6,10 +6,12 @@ from fastapi import APIRouter
 from app.api.v1 import (
     agents,
     auth,
+    dashboard,
     finance,
     health,
     integrations,
     knowledge_graph,
+    logs,
     memory,
     models,
     products,
@@ -41,3 +43,9 @@ api_router.include_router(integrations.router, prefix="/api/v1/integrations", ta
 # Finance & models
 api_router.include_router(finance.router, prefix="/api/v1/finance", tags=["finance"])
 api_router.include_router(models.router, prefix="/api/v1/models", tags=["models"])
+
+# Dashboard
+api_router.include_router(dashboard.router, prefix="/api/v1/dashboard", tags=["dashboard"])
+
+# System logs
+api_router.include_router(logs.router, prefix="/api/v1/logs", tags=["logs"])

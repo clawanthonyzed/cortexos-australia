@@ -11,7 +11,7 @@ import { AgentStatusWidget } from "@/components/dashboard/agent-status";
 import { TaskQueueWidget } from "@/components/dashboard/task-queue";
 import { CostTracker } from "@/components/dashboard/cost-tracker";
 import { SystemHealthWidget } from "@/components/dashboard/system-health";
-import { useDashboardStats, useFinance } from "@/hooks/use-finance";
+import { useDashboardStats, useFinance, useSystemHealth } from "@/hooks/use-finance";
 import { useAgents } from "@/hooks/use-agents";
 import { useTasks } from "@/hooks/use-tasks";
 import { useSystemStore } from "@/store/system-store";
@@ -25,6 +25,7 @@ export default function DashboardPage() {
   const { data: agentsData, isLoading: agentsLoading } = useAgents();
   const { data: tasksData, isLoading: tasksLoading } = useTasks({ pageSize: 10 });
   const { health } = useSystemStore();
+  useSystemHealth();
 
   const [titleShown, setTitleShown] = useState(false);
   useEffect(() => {

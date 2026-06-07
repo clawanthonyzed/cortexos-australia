@@ -21,7 +21,7 @@ export function NavUser() {
   const { user, logout } = useAuthStore();
   const router = useRouter();
 
-  const displayName = user?.name ?? user?.email ?? "Admin";
+  const displayName = user?.full_name ?? user?.username ?? user?.email ?? "Admin";
   const email = user?.email ?? "";
   const initials = displayName
     .split(" ")

@@ -7,9 +7,11 @@ const USER_KEY = "cortexos_user";
 export interface AuthUser {
   id: string;
   email: string;
-  name: string;
-  role: "admin" | "operator" | "viewer";
-  avatarUrl: string | null;
+  username: string;
+  full_name: string | null;
+  is_active: boolean;
+  is_verified: boolean;
+  roles: Array<{ name: string; permissions: string[] }>;
 }
 
 export function getAccessToken(): string | null {

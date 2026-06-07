@@ -18,6 +18,7 @@ from app.schemas.finance import (
     CostRecordRead,
     FinanceDashboard,
     MonthlySummary,
+    RevenueDataPoint,
     TokenUsageSummary,
 )
 
@@ -27,18 +28,27 @@ router = APIRouter()
 AUD_PER_USD = 1.55  # Approximate exchange rate
 
 
+def _period_to_days(period: str | None) -> int:
+    mapping = {"7d": 7, "30d": 30, "90d": 90, "1y": 365}
+    return mapping.get(period or "30d", 30)
+
+
 @router.get("/dashboard", response_model=FinanceDashboard, tags=["finance"])
 async def finance_dashboard(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_permission(Permission.FINANCE_READ)),
-    days: int = Query(default=30, ge=1, le=365),
+    period: str | None = Query(default="30d"),
+    days: int | None = Query(default=None, ge=1, le=365),
 ) -> FinanceDashboard:
     """
-    Financial dashboard — revenue, costs, profit, sales for the past N days.
-    Revenue data comes from products; costs from cost_records.
+    Financial dashboard — revenue, costs, profit, sales.
+    Accepts ?period=7d|30d|90d|1y (frontend) or ?days=N (legacy).
     """
+    n_days = days if days is not None else _period_to_days(period)
+    period_label = period or f"{n_days}d"
+
     period_end = date.today()
-    period_start = period_end - timedelta(days=days)
+    period_start = period_end - timedelta(days=n_days)
     start_dt = datetime(period_start.year, period_start.month, period_start.day, tzinfo=timezone.utc)
 
     # Token / cost usage by provider+model
@@ -50,23 +60,36 @@ async def finance_dashboard(
             func.sum(CostRecord.prompt_tokens).label("prompt_tokens"),
             func.sum(CostRecord.completion_tokens).label("completion_tokens"),
             func.sum(CostRecord.cost_usd).label("total_cost"),
+            func.count(CostRecord.id).label("request_count"),
         )
         .where(CostRecord.created_at >= start_dt)
         .group_by(CostRecord.provider, CostRecord.model)
     )
-    token_usage = [
-        TokenUsageSummary(
-            provider=row.provider,
-            model=row.model,
-            total_tokens=int(row.total_tokens or 0),
-            prompt_tokens=int(row.prompt_tokens or 0),
-            completion_tokens=int(row.completion_tokens or 0),
-            cost_usd=float(row.total_cost or 0),
-            period=f"last_{days}_days",
-        )
+    raw_usage = [
+        {
+            "provider": row.provider,
+            "model": row.model,
+            "total_tokens": int(row.total_tokens or 0),
+            "prompt_tokens": int(row.prompt_tokens or 0),
+            "completion_tokens": int(row.completion_tokens or 0),
+            "cost_usd": float(row.total_cost or 0),
+            "request_count": int(row.request_count or 0),
+        }
         for row in cost_rows
     ]
-    total_cost_usd = sum(t.cost_usd for t in token_usage)
+    total_cost_usd = sum(r["cost_usd"] for r in raw_usage)
+    grand_total = total_cost_usd or 1.0  # avoid division by zero
+
+    token_usage = [
+        TokenUsageSummary(
+            **r,
+            period=period_label,
+            percent_of_total=round((r["cost_usd"] / grand_total) * 100, 2),
+        )
+        for r in raw_usage
+    ]
+    model_costs = sorted(token_usage, key=lambda t: t.cost_usd, reverse=True)
+
     total_cost_aud = total_cost_usd * AUD_PER_USD
 
     # Product revenue
@@ -86,6 +109,36 @@ async def finance_dashboard(
     avg_order = total_revenue / total_sales if total_sales > 0 else 0.0
     profit = total_revenue - total_cost_aud
 
+    # Daily cost breakdown for revenue_history chart
+    daily_rows = await db.execute(
+        select(
+            func.date_trunc("day", CostRecord.created_at).label("day"),
+            func.sum(CostRecord.cost_usd).label("daily_cost"),
+        )
+        .where(CostRecord.created_at >= start_dt)
+        .group_by(func.date_trunc("day", CostRecord.created_at))
+        .order_by(func.date_trunc("day", CostRecord.created_at))
+    )
+    daily_costs: dict[str, float] = {
+        row.day.date().isoformat(): float(row.daily_cost or 0)
+        for row in daily_rows
+    }
+
+    # Spread total_revenue evenly across days for the chart
+    daily_revenue = total_revenue / n_days if n_days > 0 else 0.0
+    revenue_history: list[RevenueDataPoint] = []
+    for i in range(n_days):
+        day = period_start + timedelta(days=i)
+        day_str = day.isoformat()
+        cost = daily_costs.get(day_str, 0.0)
+        rev = daily_revenue
+        revenue_history.append(RevenueDataPoint(
+            date=day_str,
+            revenue=round(rev, 2),
+            costs=round(cost * AUD_PER_USD, 2),
+            profit=round(rev - cost * AUD_PER_USD, 2),
+        ))
+
     return FinanceDashboard(
         period_start=period_start,
         period_end=period_end,
@@ -96,8 +149,10 @@ async def finance_dashboard(
         total_sales=total_sales,
         avg_order_value_aud=round(avg_order, 2),
         token_usage=token_usage,
-        revenue_by_platform=[],  # Populated via platform sync
-        monthly_trend=[],  # Populated by monthly aggregation endpoint
+        revenue_by_platform=[],
+        monthly_trend=[],
+        revenue_history=revenue_history,
+        model_costs=model_costs,
     )
 
 
