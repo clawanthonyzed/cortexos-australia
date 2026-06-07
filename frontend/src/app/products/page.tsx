@@ -20,10 +20,70 @@ import { fetcher } from "@/lib/api";
 import type { Product } from "@/types/product";
 import { formatCurrency } from "@/lib/utils";
 
+interface ProductBrief {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  product_type: string;
+  status: string;
+  price_aud: number;
+  cover_image_url: string | null;
+  total_sales: number;
+  total_revenue_aud: number;
+  created_at: string;
+  updated_at: string;
+}
+
+interface ProductsBackend {
+  items: ProductBrief[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
 interface ProductsResponse {
   products: Product[];
   total: number;
   totalRevenueAud: number;
+}
+
+function adaptProduct(b: ProductBrief): Product {
+  return {
+    id: b.id,
+    name: b.name,
+    description: b.description ?? "",
+    type: (b.product_type as Product["type"]) ?? "digital_download",
+    status: (b.status === "published" ? "active" : b.status) as Product["status"],
+    platform: "direct",
+    platformId: null,
+    platformUrl: null,
+    venture: null,
+    priceAud: b.price_aud,
+    currency: "AUD",
+    totalRevenue: b.total_revenue_aud,
+    totalUnits: b.total_sales,
+    revenueThisMonth: 0,
+    unitsThisMonth: 0,
+    conversionRate: null,
+    rating: null,
+    reviewCount: 0,
+    tags: [],
+    imageUrl: b.cover_image_url,
+    salesHistory: [],
+    createdAt: b.created_at,
+    updatedAt: b.updated_at,
+  };
+}
+
+async function productsFetcher(url: string): Promise<ProductsResponse> {
+  const raw = await fetcher<ProductsBackend>(url);
+  const products = raw.items.map(adaptProduct);
+  return {
+    products,
+    total: raw.total,
+    totalRevenueAud: products.reduce((s, p) => s + p.totalRevenue, 0),
+  };
 }
 
 export default function ProductsPage() {
@@ -38,7 +98,7 @@ export default function ProductsPage() {
 
   const { data, isLoading } = useSWR<ProductsResponse>(
     `/products?${params.toString()}`,
-    fetcher,
+    productsFetcher,
     { refreshInterval: 30000 }
   );
 

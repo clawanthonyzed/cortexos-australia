@@ -82,9 +82,15 @@ class ProductReadBrief(BaseModel):
     id: uuid.UUID
     name: str
     slug: str
+    description: str | None = None
+    product_type: str
     status: str
     price_aud: float
+    is_featured: bool = False
+    cover_image_url: str | None = None
     total_sales: int
     total_revenue_aud: float
+    created_at: datetime
+    updated_at: datetime
 
     model_config = {"from_attributes": True}
