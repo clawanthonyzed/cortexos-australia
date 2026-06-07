@@ -89,6 +89,36 @@ async def list_memory(
     }
 
 
+@router.get("/stats", response_model=dict[str, Any], tags=["memory"])
+async def memory_stats(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_permission(Permission.MEMORY_READ)),
+) -> dict[str, Any]:
+    """Aggregate memory statistics for dashboard widgets."""
+    total = (await db.execute(select(func.count()).select_from(MemoryItem))).scalar_one()
+    total_size = (
+        await db.execute(select(func.coalesce(func.sum(func.length(MemoryItem.content)), 0)))
+    ).scalar_one()
+
+    type_rows = await db.execute(
+        select(MemoryItem.memory_type, func.count(MemoryItem.id).label("cnt"))
+        .group_by(MemoryItem.memory_type)
+    )
+    by_type = {row.memory_type: row.cnt for row in type_rows}
+
+    oldest = (await db.execute(select(func.min(MemoryItem.created_at)))).scalar_one()
+    newest = (await db.execute(select(func.max(MemoryItem.created_at)))).scalar_one()
+
+    return {
+        "totalEntries": total,
+        "totalSizeBytes": int(total_size),
+        "byType": by_type,
+        "byAgent": [],
+        "oldestEntryAt": oldest.isoformat() if oldest else None,
+        "newestEntryAt": newest.isoformat() if newest else None,
+    }
+
+
 @router.post("/search", response_model=MemorySearchResponse, tags=["memory"])
 async def search_memory(
     payload: MemorySearchRequest,
