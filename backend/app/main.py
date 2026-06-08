@@ -5,6 +5,7 @@ Shutdown: cleanup connections.
 """
 from __future__ import annotations
 
+import asyncio
 import time
 import uuid
 from collections.abc import AsyncGenerator
@@ -12,7 +13,7 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 import structlog
-from fastapi import FastAPI, Request, status
+from fastapi import FastAPI, Query, Request, WebSocket, WebSocketDisconnect, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -148,7 +149,64 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ── Request logging middleware ────────────────────────────────────────────────
+# ── Request logging + audit middleware ───────────────────────────────────────
+
+_SKIP_AUDIT_PATHS = {"/ready", "/health", "/metrics", "/ws"}
+
+
+async def _write_audit_log(
+    method: str,
+    path: str,
+    status_code: int,
+    elapsed_ms: float,
+    ip_address: str,
+    user_agent: str,
+    user_id: str | None,
+) -> None:
+    """Fire-and-forget: write an AuditLog row to the database."""
+    try:
+        from app.database import AsyncSessionLocal
+        from app.models.audit_log import AuditLog
+
+        action = f"{method} {path}"
+        resource_type = path.split("/")[3] if path.count("/") >= 3 else "unknown"
+
+        async with AsyncSessionLocal() as db:
+            log = AuditLog(
+                user_id=uuid.UUID(user_id) if user_id else None,
+                action=action[:100],
+                resource_type=resource_type[:100],
+                method=method,
+                path=path[:500],
+                ip_address=ip_address[:45],
+                user_agent=user_agent[:500],
+                status_code=status_code,
+                success=status_code < 400,
+            )
+            db.add(log)
+            await db.commit()
+    except Exception as exc:
+        logger.warning("Audit log write failed", error=str(exc))
+
+
+def _extract_user_id(request: Request) -> str | None:
+    """Pull user_id from JWT in Authorization header without verifying (middleware-safe)."""
+    try:
+        auth = request.headers.get("Authorization", "")
+        if not auth.startswith("Bearer "):
+            return None
+        import base64
+        import json as _json
+        token = auth[7:]
+        parts = token.split(".")
+        if len(parts) != 3:
+            return None
+        payload_b64 = parts[1] + "=="  # add padding
+        payload = _json.loads(base64.urlsafe_b64decode(payload_b64))
+        return str(payload.get("sub")) if payload.get("sub") else None
+    except Exception:
+        return None
+
 
 @app.middleware("http")
 async def request_logging_middleware(request: Request, call_next: Any) -> Any:
@@ -174,6 +232,22 @@ async def request_logging_middleware(request: Request, call_next: Any) -> Any:
     )
     response.headers["X-Request-ID"] = request_id
     response.headers["X-Response-Time"] = f"{elapsed}ms"
+
+    # Async audit log (fire-and-forget — never blocks the response)
+    if request.url.path not in _SKIP_AUDIT_PATHS and not request.url.path.startswith("/ws"):
+        user_id = _extract_user_id(request)
+        asyncio.create_task(
+            _write_audit_log(
+                method=request.method,
+                path=request.url.path,
+                status_code=response.status_code,
+                elapsed_ms=elapsed,
+                ip_address=request.client.host if request.client else "unknown",
+                user_agent=request.headers.get("User-Agent", "")[:500],
+                user_id=user_id,
+            )
+        )
+
     return response
 
 
@@ -218,3 +292,60 @@ async def internal_error_handler(request: Request, exc: Exception) -> JSONRespon
 
 from app.api.router import api_router  # noqa: E402
 app.include_router(api_router)
+
+
+# ── WebSocket endpoint ────────────────────────────────────────────────────────
+
+from app.api.v1.ws_manager import manager as ws_manager  # noqa: E402
+
+
+@app.websocket("/ws")
+async def websocket_endpoint(
+    websocket: WebSocket,
+    token: str = Query(default=""),
+) -> None:
+    """
+    Authenticated WebSocket endpoint.
+    Clients connect with ?token=<jwt>.
+    Messages: agent.status_changed, agent.metrics_updated, system.health, alert, ping/pong.
+    """
+    import json
+
+    # Validate token
+    user_id: str | None = None
+    try:
+        if token:
+            from app.auth.jwt import decode_token
+            payload = decode_token(token)
+            user_id = str(payload.get("sub", ""))
+    except Exception:
+        await websocket.close(code=4001)
+        return
+
+    client_id = str(uuid.uuid4())
+    await ws_manager.connect(client_id, websocket)
+
+    # Send initial connection ack
+    await ws_manager.send(client_id, {
+        "type": "connected",
+        "clientId": client_id,
+        "userId": user_id,
+    })
+
+    try:
+        while True:
+            try:
+                raw = await asyncio.wait_for(websocket.receive_text(), timeout=30.0)
+                msg = json.loads(raw)
+                if msg.get("type") == "ping":
+                    await ws_manager.send(client_id, {"type": "pong", "ts": time.time()})
+            except asyncio.TimeoutError:
+                # Send keepalive ping
+                await ws_manager.send(client_id, {"type": "ping", "ts": time.time()})
+            except WebSocketDisconnect:
+                break
+            except Exception as exc:
+                logger.warning("WS receive error", client_id=client_id, error=str(exc))
+                break
+    finally:
+        await ws_manager.disconnect(client_id)
