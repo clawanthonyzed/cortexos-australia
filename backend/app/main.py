@@ -82,11 +82,25 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     except Exception as exc:
         logger.warning("Memory client warmup failed", error=str(exc))
 
+    # 6. Start revenue sync scheduler
+    try:
+        from app.integrations.revenue_sync import start_revenue_sync_scheduler
+        start_revenue_sync_scheduler()
+        logger.info("Revenue sync scheduler started")
+    except Exception as exc:
+        logger.warning("Revenue sync scheduler failed to start", error=str(exc))
+
     logger.info("CortexOS Australia ready")
     yield
 
     # ── Shutdown ──────────────────────────────────────────────────────────────
     logger.info("CortexOS Australia shutting down")
+
+    try:
+        from app.integrations.revenue_sync import stop_revenue_sync_scheduler
+        stop_revenue_sync_scheduler()
+    except Exception:
+        pass
 
     try:
         from app.memory.manager import get_graphiti

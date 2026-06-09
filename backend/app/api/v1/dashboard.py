@@ -12,6 +12,7 @@ from app.auth.rbac import Permission, require_permission
 from app.dependencies import get_db
 from app.models.agent import Agent, AgentStatus
 from app.models.cost_record import CostRecord
+from app.models.revenue_record import RevenueRecord
 from app.models.task import Task, TaskStatus
 from app.models.user import User
 
@@ -75,6 +76,20 @@ async def dashboard_stats(
         )
     ).scalar_one()
 
+    # Last month costs for growth %
+    last_month_start = datetime(
+        month_start.year if month_start.month > 1 else month_start.year - 1,
+        month_start.month - 1 if month_start.month > 1 else 12,
+        1, tzinfo=timezone.utc
+    )
+    costs_last_month = (
+        await db.execute(
+            select(func.coalesce(func.sum(CostRecord.cost_usd), 0.0)).where(
+                (CostRecord.created_at >= last_month_start) & (CostRecord.created_at < month_start)
+            )
+        )
+    ).scalar_one() or 0.001  # avoid div/0
+
     # Token usage today (total_tokens)
     tokens_today = (
         await db.execute(
@@ -93,13 +108,33 @@ async def dashboard_stats(
         )
     ).scalar_one()
 
+    # Real revenue this month (AUD) from RevenueRecord
+    revenue_mtd = (
+        await db.execute(
+            select(func.coalesce(func.sum(RevenueRecord.amount_aud), 0.0)).where(
+                RevenueRecord.created_at >= month_start
+            )
+        )
+    ).scalar_one()
+
+    revenue_last_month = (
+        await db.execute(
+            select(func.coalesce(func.sum(RevenueRecord.amount_aud), 0.0)).where(
+                (RevenueRecord.created_at >= last_month_start) & (RevenueRecord.created_at < month_start)
+            )
+        )
+    ).scalar_one() or 0.001
+
+    costs_growth = round((float(costs_mtd) / float(costs_last_month) - 1) * 100, 1)
+    revenue_growth = round((float(revenue_mtd) / float(revenue_last_month) - 1) * 100, 1)
+
     return {
         "activeAgents": active_agents,
         "activeAgentsDelta": 0,
-        "revenueThisMonthAud": 0.0,
-        "revenueGrowthPercent": 0.0,
+        "revenueThisMonthAud": round(float(revenue_mtd), 2),
+        "revenueGrowthPercent": revenue_growth,
         "costsThisMonthUsd": float(costs_mtd),
-        "costsGrowthPercent": 0.0,
+        "costsGrowthPercent": costs_growth,
         "tasksCompletedToday": tasks_today,
         "tasksCompletedDelta": 0,
         "tokenUsageTodayM": round(float(tokens_today) / 1_000_000, 4),

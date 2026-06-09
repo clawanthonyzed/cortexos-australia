@@ -7,6 +7,7 @@ from app.models.memory_item import MemoryItem, MemoryType
 from app.models.product import Product, ProductStatus, ProductType
 from app.models.cost_record import CostRecord
 from app.models.audit_log import AuditLog
+from app.models.revenue_record import RevenueRecord, RevenueSource
 
 __all__ = [
     "User",
@@ -28,4 +29,6 @@ __all__ = [
     "ProductType",
     "CostRecord",
     "AuditLog",
+    "RevenueRecord",
+    "RevenueSource",
 ]
