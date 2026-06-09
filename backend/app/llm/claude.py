@@ -1,6 +1,7 @@
 """Anthropic Claude LLM implementation with prompt caching support."""
 from __future__ import annotations
 
+from collections.abc import AsyncGenerator
 from typing import Any
 
 import structlog
@@ -169,3 +170,40 @@ class ClaudeLLM(BaseLLM):
             raw=response,
             stop_reason=response.stop_reason,
         )
+
+    async def stream(
+        self,
+        messages: list[LLMMessage],
+        system: str | None = None,
+        temperature: float = 0.7,
+        max_tokens: int = 4096,
+        **kwargs: Any,
+    ) -> AsyncGenerator[str, None]:
+        """Stream token deltas from Claude via streaming API."""
+        client = self._get_client()
+
+        anthropic_messages = [
+            {"role": m.role, "content": m.content}
+            for m in messages
+            if m.role in ("user", "assistant")
+        ]
+
+        params: dict[str, Any] = {
+            "model": self.model,
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+            "messages": anthropic_messages,
+        }
+
+        if system:
+            if len(system) > 1000:
+                params["system"] = [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}]
+            else:
+                params["system"] = system
+
+        params.update(kwargs)
+
+        import anthropic
+        async with client.messages.stream(**params) as stream:
+            async for text in stream.text_stream:
+                yield text

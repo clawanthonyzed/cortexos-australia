@@ -3,10 +3,12 @@ from __future__ import annotations
 
 import json
 import uuid
+from collections.abc import AsyncGenerator
 from typing import Any
 
 import structlog
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -327,3 +329,50 @@ async def list_agent_types(
 ) -> dict[str, Any]:
     """List all registered agent types."""
     return {"types": AgentRegistry.list_types()}
+
+
+@router.get("/{agent_id}/stream", tags=["agents"])
+async def stream_agent(
+    agent_id: uuid.UUID,
+    task: str = Query(..., min_length=1, description="Task prompt for the agent"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_permission(Permission.AGENT_RUN)),
+) -> StreamingResponse:
+    """
+    Stream agent execution as Server-Sent Events (SSE).
+    Connect with EventSource — events: started, thinking, token, completed, error.
+    """
+    agent_db = await db.get(Agent, agent_id)
+    if not agent_db:
+        raise HTTPException(status_code=404, detail=_error("Agent not found"))
+
+    if agent_db.status == AgentStatus.RUNNING:
+        raise HTTPException(status_code=409, detail=_error("Agent already running"))
+
+    live_agent = await AgentRegistry.spawn_from_db(db, agent_id)
+    if not live_agent:
+        raise HTTPException(status_code=503, detail=_error("Failed to spawn agent"))
+
+    async def event_generator() -> AsyncGenerator[str, None]:
+        from app.api.v1.ws_manager import manager as ws_manager
+        async for event in live_agent.run_stream(task=task):
+            event_type = event.get("event", "message")
+            data = json.dumps(event)
+            yield f"event: {event_type}\ndata: {data}\n\n"
+            # Mirror to WebSocket so connected dashboards update live
+            await ws_manager.broadcast({
+                "type": f"agent.{event_type}",
+                "agentId": str(agent_id),
+                "agentName": agent_db.name,
+                **event,
+            })
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )

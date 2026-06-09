@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import time
 import uuid
+from collections.abc import AsyncGenerator
 from dataclasses import dataclass, field
 from typing import Any, TypedDict
 
@@ -282,3 +283,73 @@ class BaseAgent:
                     duration_seconds=round(elapsed, 3),
                     trace_id=trace_id,
                 )
+
+    async def run_stream(
+        self,
+        task: str,
+        context: dict[str, Any] | None = None,
+    ) -> AsyncGenerator[dict[str, Any], None]:
+        """
+        Stream agent execution as a series of SSE-compatible events.
+        Event types: started | thinking | token | completed | error
+        """
+        self.status = AgentStatus.RUNNING
+        t0 = time.perf_counter()
+        context = context or {}
+
+        yield {"event": "started", "agent": self.name, "task": task[:200]}
+
+        try:
+            memories = await self.memory.recall(
+                query=task,
+                agent_id=str(self.agent_db_id) if self.agent_db_id else None,
+                limit=5,
+            )
+            memory_context = ""
+            if memories:
+                memory_context = "\n\nRelevant memories:\n" + "\n".join(
+                    f"- {m.get('memory', '')}" for m in memories
+                )
+
+            system = (
+                self.system_prompt
+                + memory_context
+                + "\n\nContext:\n"
+                + json.dumps(context, indent=2, default=str)
+            )
+
+            yield {"event": "thinking", "message": "Recalling memories and building context…"}
+
+            messages = [LLMMessage(role="user", content=task)]
+            full_content = ""
+
+            async for token in self.llm.stream(
+                messages=messages,
+                system=system,
+                temperature=self.temperature,
+                max_tokens=self.max_tokens,
+            ):
+                full_content += token
+                yield {"event": "token", "delta": token}
+
+            elapsed = round(time.perf_counter() - t0, 3)
+            self.status = AgentStatus.IDLE
+
+            await self.memory.remember(
+                content=f"Task: {task[:200]}\nResult: {full_content[:500]}",
+                agent_id=str(self.agent_db_id) if self.agent_db_id else None,
+                memory_type="episodic",
+                importance=0.6,
+            )
+
+            yield {
+                "event": "completed",
+                "content": full_content,
+                "duration_seconds": elapsed,
+                "agent": self.name,
+            }
+
+        except Exception as exc:
+            self.status = AgentStatus.ERROR
+            logger.error("Agent stream failed", agent=self.name, error=str(exc))
+            yield {"event": "error", "error": str(exc)}

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import AsyncGenerator
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -64,6 +65,24 @@ class BaseLLM(ABC):
         **kwargs: Any,
     ) -> LLMResponse:
         """Send messages and return a single completion."""
+
+    async def stream(
+        self,
+        messages: list[LLMMessage],
+        system: str | None = None,
+        temperature: float = 0.7,
+        max_tokens: int = 4096,
+        **kwargs: Any,
+    ) -> AsyncGenerator[str, None]:
+        """Stream token deltas. Default: fall back to single completion."""
+        response = await self.complete(
+            messages=messages,
+            system=system,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            **kwargs,
+        )
+        yield response.content
 
     async def complete_simple(
         self,

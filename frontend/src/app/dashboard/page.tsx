@@ -18,6 +18,7 @@ import { useSystemStore } from "@/store/system-store";
 import { formatCurrency, formatTokens, formatPercent } from "@/lib/utils";
 import { tokenUsageToModelCost } from "@/types/finance";
 import { Skeleton } from "@/components/ui/skeleton";
+import { VentureHealthMatrix } from "@/components/dashboard/venture-health";
 
 export default function DashboardPage() {
   const { data: stats, isLoading: statsLoading } = useDashboardStats();
@@ -191,6 +192,9 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
+
+        {/* Venture Health Matrix — full width */}
+        <VentureHealthMatrix />
       </div>
     </AppShell>
   );

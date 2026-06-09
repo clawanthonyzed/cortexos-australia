@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  ArrowLeft, Bot, Play, Square, Pause, Edit3, Save,
+  ArrowLeft, Bot, Play, Square, Pause, Edit3, Save, Zap,
   Activity, DollarSign, CheckCircle2, Cpu, Clock, Brain
 } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
@@ -82,6 +82,10 @@ export default function AgentDetailPage() {
           </div>
 
           <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => router.push(`/agents/${id}/playground`)}>
+              <Zap className="h-3.5 w-3.5" />
+              Playground
+            </Button>
             <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
               <Edit3 className="h-3.5 w-3.5" />
               Edit
