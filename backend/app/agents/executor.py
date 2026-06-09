@@ -18,6 +18,10 @@ from app.models.task import Task, TaskStatus
 
 logger = structlog.get_logger(__name__)
 
+# Process-level task stream queues: task_id → asyncio.Queue
+# SSE endpoints register here before execution starts so no events are lost.
+_task_queues: dict[str, asyncio.Queue] = {}
+
 
 def _broadcast(event_type: str, payload: dict) -> None:
     """Fire-and-forget WS broadcast — never blocks the executor."""
@@ -33,13 +37,38 @@ class AgentExecutor:
     Orchestrates agent execution:
     1. Loads the agent from DB
     2. Spawns the live BaseAgent instance
-    3. Runs the task
+    3. Runs the task (streaming or non-streaming)
     4. Updates Task and Agent DB records with results
     5. Broadcasts task/agent status changes via WebSocket
     """
 
     def __init__(self, db: AsyncSession) -> None:
         self.db = db
+
+    # ------------------------------------------------------------------
+    # Stream queue management (class-level, process-wide)
+    # ------------------------------------------------------------------
+
+    @classmethod
+    def register_stream(cls, task_id: uuid.UUID) -> asyncio.Queue:
+        """Register a queue to receive events for a task stream. Call before execute_task."""
+        q: asyncio.Queue = asyncio.Queue()
+        _task_queues[str(task_id)] = q
+        return q
+
+    @classmethod
+    def unregister_stream(cls, task_id: uuid.UUID) -> None:
+        _task_queues.pop(str(task_id), None)
+
+    async def _emit(self, task_id: uuid.UUID, event: dict) -> None:
+        """Put event on queue (if registered) and broadcast via WebSocket."""
+        q = _task_queues.get(str(task_id))
+        if q:
+            await q.put(event)
+        _broadcast(f"task.{event.get('type', 'event')}", {
+            "taskId": str(task_id),
+            **event,
+        })
 
     async def execute_task(self, task_id: uuid.UUID) -> AgentResult:
         """Execute a Task by its ID. Updates task status throughout execution."""
@@ -89,9 +118,28 @@ class AgentExecutor:
         context = input_data.get("context", {})
 
         try:
-            result = await agent.run(task=task_prompt, context=context)
+            streaming = str(task_id) in _task_queues
+            if streaming:
+                # Stream all agent events to the registered queue
+                full_content = ""
+                async for event in agent.run_stream(task=task_prompt, context=context):
+                    await self._emit(task_id, event)
+                    if event.get("event") == "token":
+                        full_content += event.get("delta", "")
+                    elif event.get("event") == "completed":
+                        elapsed = event.get("duration_seconds", 0.0)
+
+                result = AgentResult(
+                    content=full_content,
+                    success=True,
+                    duration_seconds=elapsed if "elapsed" in dir() else 0.0,
+                )
+            else:
+                result = await agent.run(task=task_prompt, context=context)
         except Exception as exc:
             logger.error("Agent execution error", task_id=str(task_id), error=str(exc))
+            if str(task_id) in _task_queues:
+                await self._emit(task_id, {"type": "task.error", "error": str(exc)})
             result = AgentResult(content="", success=False, error=str(exc))
 
         now = datetime.now(tz=timezone.utc)
@@ -120,6 +168,19 @@ class AgentExecutor:
             "costUsd": result.cost_usd,
             "durationSeconds": result.duration_seconds,
         })
+
+        # Signal stream consumers that execution is done
+        if str(task_id) in _task_queues:
+            final_type = "task.completed" if result.success else "task.error"
+            await self._emit(task_id, {
+                "type": final_type,
+                "taskId": str(task_id),
+                "status": task.status,
+                "costUsd": result.cost_usd,
+                "durationSeconds": result.duration_seconds,
+                "error": result.error,
+            })
+            self.unregister_stream(task_id)
 
         await self._update_agent_metrics(task.agent_id, result)
 

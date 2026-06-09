@@ -1,16 +1,20 @@
-"""Task CRUD + execute/cancel/retry endpoints."""
+"""Task CRUD + execute/cancel/retry/stream endpoints."""
 from __future__ import annotations
 
+import asyncio
 import json
 import uuid
+from collections.abc import AsyncGenerator
 from datetime import datetime
 from typing import Any
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.agents.executor import AgentExecutor
 from app.auth.rbac import Permission, require_permission
 from app.dependencies import get_db, paginate
 from app.models.task import Task, TaskStatus
@@ -308,3 +312,74 @@ async def retry_task(
     await db.flush()
     await db.refresh(task)
     return TaskRead.model_validate(task)
+
+
+@router.get("/{task_id}/stream", tags=["tasks"])
+async def stream_task(
+    task_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_permission(Permission.TASK_CREATE)),
+) -> StreamingResponse:
+    """
+    Stream task execution as Server-Sent Events.
+
+    Registers a queue BEFORE starting execution so no events are lost.
+    Events: task.started, agent.thinking, agent.token, task.completed, task.error.
+
+    Connect with EventSource or fetch+ReadableStream.
+    The stream closes automatically when task.completed or task.error is emitted.
+    """
+    task = await db.get(Task, task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail=_error("Task not found"))
+
+    if task.status == TaskStatus.RUNNING:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=_error("Task is already running — connect to its existing stream via WS"),
+        )
+
+    if task.status == TaskStatus.COMPLETED:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=_error("Task already completed"),
+        )
+
+    if not task.agent_id:
+        raise HTTPException(status_code=422, detail=_error("Task has no assigned agent"))
+
+    # Register queue BEFORE spawning execution so we capture every event
+    queue = AgentExecutor.register_stream(task_id)
+    executor = AgentExecutor(db)
+
+    # Fire execution as a background coroutine — do not await here
+    asyncio.create_task(executor.execute_task(task_id))
+
+    async def event_generator() -> AsyncGenerator[str, None]:
+        terminal_types = {"task.completed", "task.error"}
+        try:
+            while True:
+                try:
+                    event = await asyncio.wait_for(queue.get(), timeout=120.0)
+                except asyncio.TimeoutError:
+                    # Keepalive comment to prevent nginx/proxy timeout
+                    yield ": keepalive\n\n"
+                    continue
+
+                event_type = event.get("type") or event.get("event", "message")
+                yield f"event: {event_type}\ndata: {json.dumps(event)}\n\n"
+
+                if event_type in terminal_types:
+                    break
+        finally:
+            AgentExecutor.unregister_stream(task_id)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )
