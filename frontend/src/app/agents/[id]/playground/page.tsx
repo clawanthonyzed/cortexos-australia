@@ -86,6 +86,7 @@ export default function AgentPlaygroundPage() {
       const reader = res.body!.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
+      let terminalReceived = false;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -120,14 +121,16 @@ export default function AgentPlaygroundPage() {
               tokenCount: 0,
             });
             setPhase("done");
+            terminalReceived = true;
           } else if (data.event === "error") {
             setErrorMsg(data.error);
             setPhase("error");
+            terminalReceived = true;
           }
         }
       }
 
-      if (phase === "running") setPhase("done");
+      if (!terminalReceived) setPhase("done");
     } catch (err: any) {
       if (err.name === "AbortError") {
         setPhase("idle");
