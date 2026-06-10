@@ -48,6 +48,10 @@ class Permission(StrEnum):
     FINANCE_READ = "finance:read"
     FINANCE_EXPORT = "finance:export"
 
+    # Venture permissions
+    VENTURE_READ = "venture:read"
+    VENTURE_WRITE = "venture:write"
+
     # User management
     USER_READ = "user:read"
     USER_CREATE = "user:create"
@@ -76,6 +80,7 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         Permission.PRODUCT_READ, Permission.PRODUCT_CREATE, Permission.PRODUCT_UPDATE,
         Permission.FINANCE_READ,
         Permission.INTEGRATION_READ, Permission.INTEGRATION_MANAGE,
+        Permission.VENTURE_READ, Permission.VENTURE_WRITE,
     ],
     "viewer": [
         Permission.AGENT_READ,
@@ -85,6 +90,7 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         Permission.PRODUCT_READ,
         Permission.FINANCE_READ,
         Permission.INTEGRATION_READ,
+        Permission.VENTURE_READ,
     ],
 }
 

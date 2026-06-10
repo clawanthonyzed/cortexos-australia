@@ -36,6 +36,11 @@ class MemoryItem(Base, UUIDMixin, TimestampMixin):
         ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
     )
 
+    # Multi-tenant venture ownership (SPEC-COS-04)
+    venture_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("ventures.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+
     # Content
     content: Mapped[str] = mapped_column(Text, nullable=False)
     summary: Mapped[str | None] = mapped_column(Text, nullable=True)

@@ -16,6 +16,7 @@ from app.api.v1 import (
     models,
     products,
     tasks,
+    ventures,
     workflows,
 )
 
@@ -31,6 +32,7 @@ api_router.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
 api_router.include_router(agents.router, prefix="/api/v1/agents", tags=["agents"])
 api_router.include_router(tasks.router, prefix="/api/v1/tasks", tags=["tasks"])
 api_router.include_router(workflows.router, prefix="/api/v1/workflows", tags=["workflows"])
+api_router.include_router(ventures.router, prefix="/api/v1/ventures", tags=["ventures"])
 
 # Memory & knowledge
 api_router.include_router(memory.router, prefix="/api/v1/memory", tags=["memory"])

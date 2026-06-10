@@ -46,6 +46,9 @@ async def list_agents(
 ) -> dict[str, Any]:
     """List all agents with pagination."""
     stmt = select(Agent)
+    if current_user.venture_id is not None:
+        # Tenant scoping (SPEC-COS-04): non-platform users only see their venture's agents
+        stmt = stmt.where(Agent.venture_id == current_user.venture_id)
     if agent_type:
         stmt = stmt.where(Agent.agent_type == agent_type)
     if status_filter:

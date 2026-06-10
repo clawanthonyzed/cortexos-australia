@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, Float, Integer, String, Text
+from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base, TimestampMixin, UUIDMixin
@@ -29,6 +29,11 @@ class Agent(Base, UUIDMixin, TimestampMixin):
     name: Mapped[str] = mapped_column(String(100), unique=True, nullable=False, index=True)
     purpose: Mapped[str] = mapped_column(Text, nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Multi-tenant venture ownership (SPEC-COS-04)
+    venture_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("ventures.id", ondelete="SET NULL"), nullable=True, index=True
+    )
 
     # LLM configuration
     model_provider: Mapped[str] = mapped_column(String(50), nullable=False, default="claude")

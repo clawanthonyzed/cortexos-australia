@@ -63,6 +63,11 @@ class User(Base, UUIDMixin, TimestampMixin):
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     refresh_token_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
+    # Multi-tenant venture scoping — if set, user's queries are scoped to this venture (SPEC-COS-04)
+    venture_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("ventures.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+
     # Relationships
     user_roles: Mapped[list["UserRole"]] = relationship(
         "UserRole", back_populates="user", cascade="all, delete-orphan"

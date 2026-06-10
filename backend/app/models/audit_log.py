@@ -21,6 +21,11 @@ class AuditLog(Base, UUIDMixin, TimestampMixin):
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
     )
 
+    # Multi-tenant venture ownership (SPEC-COS-04)
+    venture_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("ventures.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+
     # What was done
     action: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
     resource_type: Mapped[str] = mapped_column(String(100), nullable=False, index=True)

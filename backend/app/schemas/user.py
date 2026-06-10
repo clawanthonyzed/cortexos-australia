@@ -67,6 +67,7 @@ class UserRead(UserBase):
     is_active: bool
     is_verified: bool
     last_login_at: datetime | None
+    venture_id: uuid.UUID | None = None
     created_at: datetime
     updated_at: datetime
     roles: list[RoleRead] = Field(default_factory=list)

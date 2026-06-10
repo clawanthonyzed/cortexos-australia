@@ -27,6 +27,11 @@ class CostRecord(Base, UUIDMixin, TimestampMixin):
         ForeignKey("workflows.id", ondelete="SET NULL"), nullable=True, index=True
     )
 
+    # Multi-tenant venture ownership (SPEC-COS-04)
+    venture_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("ventures.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+
     # LLM details
     provider: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     model: Mapped[str] = mapped_column(String(100), nullable=False, index=True)

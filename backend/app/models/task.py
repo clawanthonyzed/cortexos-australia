@@ -45,6 +45,11 @@ class Task(Base, UUIDMixin, TimestampMixin):
         ForeignKey("agents.id", ondelete="SET NULL"), nullable=True, index=True
     )
 
+    # Multi-tenant venture ownership (SPEC-COS-04)
+    venture_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("ventures.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+
     # Status & lifecycle
     status: Mapped[str] = mapped_column(
         String(20), nullable=False, default=TaskStatus.PENDING, index=True
