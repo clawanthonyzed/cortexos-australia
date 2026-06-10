@@ -5,7 +5,7 @@ import axios, {
 } from "axios";
 import { getAccessToken, getRefreshToken, setTokens, clearTokens } from "./auth";
 
-const BASE_URL =
+export const BASE_URL =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 let isRefreshing = false;
