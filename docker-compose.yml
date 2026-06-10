@@ -91,6 +91,12 @@ services:
     volumes:
       - ./backend:/app
     command: celery -A app.tasks.celery_app worker --loglevel=info
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A app.tasks.celery_app inspect ping -d celery@$$HOSTNAME || exit 1"]
+      interval: 30s
+      timeout: 10s
+      start_period: 15s
+      retries: 3
 
   frontend:
     build:
