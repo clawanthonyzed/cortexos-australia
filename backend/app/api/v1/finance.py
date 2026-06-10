@@ -219,6 +219,71 @@ async def monthly_summary(
     return {"months": summaries}
 
 
+@router.get("/revenue", tags=["finance"])
+async def revenue_breakdown(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_permission(Permission.FINANCE_READ)),
+    period: str | None = Query(default="30d"),
+    venture: str | None = Query(None, description="Filter by venture slug"),
+) -> dict[str, Any]:
+    """
+    Real revenue breakdown from RevenueRecord table (Gumroad/Etsy/LemonSqueezy).
+    Returns totals by platform, by venture, and daily time series.
+    """
+    from app.models.revenue_record import RevenueRecord
+
+    n_days = _period_to_days(period)
+    start_dt = datetime.now(tz=timezone.utc) - timedelta(days=n_days)
+
+    stmt = select(RevenueRecord).where(RevenueRecord.created_at >= start_dt)
+    if venture:
+        stmt = stmt.where(RevenueRecord.venture_slug == venture)
+
+    result = await db.execute(stmt.order_by(RevenueRecord.created_at.desc()))
+    records = result.scalars().all()
+
+    total_aud = sum(r.amount_aud for r in records)
+
+    # Group by source
+    by_source: dict[str, float] = {}
+    for r in records:
+        by_source[r.source] = by_source.get(r.source, 0.0) + r.amount_aud
+
+    # Group by venture
+    by_venture: dict[str, float] = {}
+    for r in records:
+        key = r.venture_slug or "unattributed"
+        by_venture[key] = by_venture.get(key, 0.0) + r.amount_aud
+
+    # Daily time series
+    from collections import defaultdict
+    daily: dict[str, float] = defaultdict(float)
+    for r in records:
+        day = r.created_at.date().isoformat()
+        daily[day] += r.amount_aud
+
+    return {
+        "period": period,
+        "total_revenue_aud": round(total_aud, 2),
+        "record_count": len(records),
+        "by_source": {k: round(v, 2) for k, v in sorted(by_source.items(), key=lambda x: -x[1])},
+        "by_venture": {k: round(v, 2) for k, v in sorted(by_venture.items(), key=lambda x: -x[1])},
+        "daily": {k: round(v, 2) for k, v in sorted(daily.items())},
+        "note": "Set GUMROAD_API_KEY env var to enable live Gumroad sync",
+    }
+
+
+@router.post("/revenue/sync", tags=["finance"])
+async def trigger_revenue_sync(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_permission(Permission.FINANCE_READ)),
+) -> dict[str, Any]:
+    """Manually trigger a Gumroad revenue sync (also runs every 15 min automatically)."""
+    from app.integrations.gumroad import sync_gumroad_sales
+    inserted = await sync_gumroad_sales(db, lookback_days=7)
+    return {"inserted": inserted, "message": f"Synced {inserted} new revenue records from Gumroad"}
+
+
 @router.get("/forecast", tags=["finance"])
 async def revenue_forecast(
     current_user: User = Depends(require_permission(Permission.FINANCE_READ)),
