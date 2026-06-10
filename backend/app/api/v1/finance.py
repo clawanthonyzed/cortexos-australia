@@ -269,7 +269,7 @@ async def revenue_breakdown(
         "by_source": {k: round(v, 2) for k, v in sorted(by_source.items(), key=lambda x: -x[1])},
         "by_venture": {k: round(v, 2) for k, v in sorted(by_venture.items(), key=lambda x: -x[1])},
         "daily": {k: round(v, 2) for k, v in sorted(daily.items())},
-        "note": "Set GUMROAD_API_KEY env var to enable live Gumroad sync",
+        "note": "Set GUMROAD_ACCESS_TOKEN env var to enable live Gumroad sync",
     }
 
 

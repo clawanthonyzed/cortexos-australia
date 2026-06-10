@@ -1,7 +1,7 @@
 """Gumroad sales sync — fetches new sales and upserts to revenue_records.
 
 API docs: https://app.gumroad.com/api
-Auth: Bearer token (GUMROAD_API_KEY env var)
+Auth: Bearer token (GUMROAD_ACCESS_TOKEN env var)
 
 Sales endpoint: GET /v2/sales
   Returns sales in reverse chronological order, paginated by `page_key`.
@@ -67,9 +67,9 @@ async def sync_gumroad_sales(db: AsyncSession, lookback_days: int = 2) -> int:
     Pull recent Gumroad sales and upsert to revenue_records.
     Returns count of new records inserted.
     """
-    api_key = os.environ.get("GUMROAD_API_KEY", "")
+    api_key = os.environ.get("GUMROAD_ACCESS_TOKEN", "")
     if not api_key:
-        logger.warning("GUMROAD_API_KEY not set — skipping Gumroad sync")
+        logger.warning("GUMROAD_ACCESS_TOKEN not set — skipping Gumroad sync")
         return 0
 
     fx_rate = await get_usd_aud_rate()
