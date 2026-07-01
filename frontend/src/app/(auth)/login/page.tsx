@@ -1,118 +1,100 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Zap, Eye, EyeOff, AlertCircle } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Zap } from "lucide-react";
 import { useAuthStore } from "@/store/auth-store";
-import type { Metadata } from "next";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const { login, isLoading, error, clearError } = useAuthStore();
+  const [pin, setPin] = useState(["", "", "", "", "", ""]);
+  const [loading, setLoading] = useState(false);
+  const [localError, setLocalError] = useState("");
+  const inputs = useRef<(HTMLInputElement | null)[]>([]);
+  const { pinLogin, error: storeError, clearError } = useAuthStore();
   const router = useRouter();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const displayError = localError || storeError || "";
+
+  useEffect(() => {
+    inputs.current[0]?.focus();
+  }, []);
+
+  const handleChange = (index: number, value: string) => {
+    if (!/^\d?$/.test(value)) return;
+    const newPin = [...pin];
+    newPin[index] = value;
+    setPin(newPin);
+    setLocalError("");
+    clearError();
+    if (value && index < 5) {
+      inputs.current[index + 1]?.focus();
+    }
+    if (newPin.every((d) => d !== "")) {
+      submitPin(newPin.join(""));
+    }
+  };
+
+  const handleKeyDown = (index: number, e: React.KeyboardEvent) => {
+    if (e.key === "Backspace" && !pin[index] && index > 0) {
+      inputs.current[index - 1]?.focus();
+    }
+  };
+
+  const submitPin = async (pinStr: string) => {
+    setLoading(true);
+    setLocalError("");
     try {
-      await login(email, password);
+      await pinLogin(pinStr);
       router.replace("/dashboard");
     } catch {
-      // error is set in store
+      setLocalError("Invalid PIN");
+      setPin(["", "", "", "", "", ""]);
+      setTimeout(() => inputs.current[0]?.focus(), 50);
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <div className="flex h-screen w-screen items-center justify-center bg-cortex-bg grid-bg">
-      <div className="w-full max-w-sm">
-        {/* Logo */}
-        <div className="flex flex-col items-center mb-8">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-cortex-accent mb-3 shadow-lg shadow-cortex-accent/20">
+      <div className="flex flex-col items-center gap-8">
+        <div className="flex flex-col items-center gap-3">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-cortex-accent shadow-lg shadow-cortex-accent/20">
             <Zap className="h-6 w-6 text-white" />
           </div>
-          <h1 className="text-xl font-bold text-cortex-text">CortexOS</h1>
-          <p className="text-sm text-cortex-muted">Agentic Operating System</p>
+          <div className="text-center">
+            <h1 className="text-2xl font-bold text-cortex-text tracking-tight">CortexOS</h1>
+            <p className="text-cortex-muted mt-1 text-sm">Enter PIN to continue</p>
+          </div>
         </div>
 
-        {/* Card */}
-        <div className="rounded-xl border border-cortex-border bg-cortex-surface p-6 shadow-2xl">
-          <h2 className="text-base font-semibold text-cortex-text mb-1">Sign in</h2>
-          <p className="text-sm text-cortex-muted mb-6">Enter your credentials to access the command center</p>
-
-          {error && (
-            <div className="flex items-center gap-2 rounded-md bg-cortex-error/10 border border-cortex-error/20 px-3 py-2 mb-4">
-              <AlertCircle className="h-4 w-4 text-cortex-error flex-shrink-0" />
-              <p className="text-sm text-cortex-error">{error}</p>
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="operator@cortexos.ai"
-                value={email}
-                onChange={(e) => { setEmail(e.target.value); clearError(); }}
-                required
-                autoComplete="email"
+        <div className="rounded-xl border border-cortex-border bg-cortex-surface p-8 shadow-2xl flex flex-col items-center gap-6">
+          <div className="flex gap-3">
+            {pin.map((digit, i) => (
+              <input
+                key={i}
+                ref={(el) => { inputs.current[i] = el; }}
+                type="password"
+                inputMode="numeric"
+                maxLength={1}
+                value={digit}
+                onChange={(e) => handleChange(i, e.target.value)}
+                onKeyDown={(e) => handleKeyDown(i, e)}
+                disabled={loading}
+                className="w-12 h-14 text-center text-2xl font-mono rounded-lg bg-cortex-bg border border-cortex-border text-cortex-text focus:outline-none focus:border-cortex-accent focus:ring-1 focus:ring-cortex-accent disabled:opacity-50 caret-transparent transition-colors"
               />
-            </div>
+            ))}
+          </div>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="password">Password</Label>
-              <div className="relative">
-                <Input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => { setPassword(e.target.value); clearError(); }}
-                  required
-                  autoComplete="current-password"
-                  className="pr-10"
-                />
-                <button
-                  type="button"
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-cortex-muted hover:text-cortex-text transition-colors"
-                  onClick={() => setShowPassword(!showPassword)}
-                  aria-label={showPassword ? "Hide password" : "Show password"}
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
-            </div>
-
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={isLoading || !email || !password}
-              size="lg"
-            >
-              {isLoading ? "Signing in..." : "Sign in"}
-            </Button>
-          </form>
-
-          {/* Dev bypass */}
-          {process.env.NODE_ENV === "development" && (
-            <div className="mt-4 pt-4 border-t border-cortex-border">
-              <button
-                type="button"
-                onClick={() => router.replace("/dashboard")}
-                className="w-full text-center text-xs text-cortex-muted hover:text-cortex-accent transition-colors"
-              >
-                Dev: Skip login → Dashboard
-              </button>
-            </div>
+          {displayError && (
+            <p className="text-cortex-error text-sm">{displayError}</p>
+          )}
+          {loading && (
+            <p className="text-cortex-muted text-sm">Verifying...</p>
           )}
         </div>
 
-        <p className="mt-4 text-center text-xs text-cortex-muted">
+        <p className="text-center text-xs text-cortex-muted">
           CortexOS Australia · Secure Access
         </p>
       </div>

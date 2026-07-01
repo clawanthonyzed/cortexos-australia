@@ -19,6 +19,7 @@ from app.models.audit_log import AuditLog
 from app.models.user import Role, User, UserRole
 from app.schemas.user import (
     LoginRequest,
+    PinLoginRequest,
     RefreshRequest,
     TokenResponse,
     UserCreate,
@@ -218,3 +219,56 @@ async def get_me(
     )
     user = result.scalar_one()
     return UserRead.model_validate(user)
+
+@router.post("/pin-login", response_model=TokenResponse, tags=["auth"])
+async def pin_login(
+    payload: PinLoginRequest,
+    db: AsyncSession = Depends(get_db),
+) -> TokenResponse:
+    """Authenticate with 6-digit PIN. Returns JWT tokens."""
+    import os
+
+    admin_pin_hash = os.getenv("ADMIN_PIN_HASH", "")
+    if not admin_pin_hash or not verify_password(payload.pin, admin_pin_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={"error": "Invalid PIN"},
+        )
+
+    # Get admin user
+    result = await db.execute(
+        select(User)
+        .where(User.username == "anthony")
+        .options(selectinload(User.user_roles).selectinload(UserRole.role))
+    )
+    user = result.scalar_one_or_none()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"error": "Admin user not found. Run seed script."},
+        )
+
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"error": "Account is deactivated"},
+        )
+
+    # Update last login
+    user.last_login_at = datetime.now(timezone.utc)
+
+    roles = [ur.role.name for ur in user.user_roles if ur.role]
+    access_token = create_access_token(user.id, roles)
+    refresh_token = create_refresh_token(user.id)
+
+    # Store refresh token hash for revocation
+    user.refresh_token_hash = hash_password(refresh_token)
+    await db.flush()
+
+    from app.config import settings
+    return TokenResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        expires_in=settings.access_token_expire_minutes * 60,
+    )

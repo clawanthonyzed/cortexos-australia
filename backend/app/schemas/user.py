@@ -113,3 +113,7 @@ class TokenPayload(BaseModel):
     iat: int
     type: str  # "access" or "refresh"
     roles: list[str] = Field(default_factory=list)
+
+
+class PinLoginRequest(BaseModel):
+    pin: str = Field(..., pattern=r"^\d{6}$", description="6-digit PIN")

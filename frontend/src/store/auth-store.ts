@@ -21,6 +21,7 @@ interface AuthState {
   isLoading: boolean;
   error: string | null;
   login: (email: string, password: string) => Promise<void>;
+  pinLogin: (pin: string) => Promise<void>;
   logout: () => void;
   setUser: (user: AuthUser) => void;
   clearError: () => void;
@@ -48,6 +49,24 @@ export const useAuthStore = create<AuthState>()(
         } catch (err: unknown) {
           const message =
             err instanceof Error ? err.message : "Login failed. Check your credentials.";
+          set({ error: message, isLoading: false });
+          throw err;
+        }
+      },
+
+      pinLogin: async (pin: string) => {
+        set({ isLoading: true, error: null });
+        try {
+          const tokens = await apiClient.post<LoginResponse>("/auth/pin-login", {
+            pin,
+          });
+          setTokens(tokens.access_token, tokens.refresh_token);
+          const user = await apiClient.get<AuthUser>("/auth/me");
+          setStoredUser(user);
+          set({ user, isAuthenticated: true, isLoading: false });
+        } catch (err: unknown) {
+          const message =
+            err instanceof Error ? err.message : "Invalid PIN";
           set({ error: message, isLoading: false });
           throw err;
         }

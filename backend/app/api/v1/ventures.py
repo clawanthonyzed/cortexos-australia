@@ -73,3 +73,51 @@ async def venture_health(
     if not venture:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_error("Venture not found"))
     return await compute_venture_health(db, venture)
+
+@router.get("/registry", response_model=dict, tags=["ventures"])
+async def list_ventures_from_registry(
+    current_user: User = Depends(require_permission(Permission.VENTURE_READ)),
+) -> dict:
+    """List all ventures from the empire registry.json (live data, no DB needed)."""
+    import json as _json
+    import os as _os
+
+    registry_path = "/opt/openclaw/orchestration/registry.json"
+    if not _os.path.exists(registry_path):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={"error": "Registry not available"},
+        )
+
+    with open(registry_path) as f:
+        data = _json.load(f)
+
+    agents = data.get("agents", [])
+    ventures: dict = {}
+
+    for agent in agents:
+        venture_slug = agent.get("venture", "")
+        if not venture_slug or agent.get("is_specialist"):
+            continue
+        if venture_slug not in ventures:
+            ventures[venture_slug] = {
+                "id": venture_slug,
+                "name": venture_slug.replace("-", " ").title(),
+                "slug": venture_slug,
+                "manager": None,
+                "workers": [],
+                "status": "active",
+                "revenue_target": None,
+            }
+        if ventures[venture_slug]["manager"] is None:
+            ventures[venture_slug]["manager"] = agent["name"]
+        else:
+            ventures[venture_slug]["workers"].append(agent["name"])
+
+    items = sorted(ventures.values(), key=lambda v: v["name"])
+    return {
+        "items": items,
+        "total": len(items),
+        "source": "registry.json",
+        "built": data.get("built"),
+    }
