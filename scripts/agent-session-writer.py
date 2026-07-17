@@ -1,25 +1,29 @@
 #!/usr/bin/env python3
 """
-agent-session-writer.py — PostToolUse hook for all CortexOS agents.
+agent-session-writer.py — PostToolUse/Stop hook for all CortexOS agents.
 
 Fires after every tool call. Accumulates a session buffer in /tmp/,
-then flushes to /opt/openclaw/second-brain/raw/ on Claude Code Stop.
+then flushes to /opt/openclaw/second-brain/raw/ AND to CortexOS memory
+(SPEC-COS-16) on Claude Code Stop.
 
-Install: add to every agent .md file's PostToolUse hooks section:
-  hooks:
-    PostToolUse:
-      - name: Second Brain Capture
-        matcher: ".*"
-        command: python3 /opt/openclaw/second-brain/agent-session-writer.py
+Canonical source: /opt/cortexos/scripts/agent-session-writer.py (this repo).
+Wired GLOBALLY in /root/.claude/settings.json's PostToolUse/Stop hooks —
+NOT per-agent .md frontmatter (that was this docstring's original, incorrect
+install instruction; per-agent .md files here don't support inline hooks
+config, and as of 2026-07-17 zero of 330 agent files referenced this script
+at all — it had never actually run). One settings.json edit covers every
+agent since they all share the same root-level Claude Code config.
 
 Usage (called by Claude Code hook infrastructure):
   python3 agent-session-writer.py [--flush]
-  - Without --flush: accumulate tool event to session buffer
-  - With --flush: write buffer to second brain raw dir and clear
+  - Without --flush: accumulate tool event to session buffer (PostToolUse)
+  - With --flush: write buffer to second brain + CortexOS, then clear (Stop)
 
-Environment variables set by Claude Code:
-  CLAUDE_TOOL_NAME, CLAUDE_TOOL_INPUT, CLAUDE_TOOL_RESULT (JSON strings)
-  CLAUDE_SESSION_ID, CLAUDE_AGENT_NAME (if set in agent config)
+Agent identity: read from the hook's stdin JSON `.metadata.agent` /
+`.metadata.venture` first (the channel notify-mattermost.sh already uses),
+falling back to CLAUDE_TOOL_NAME/CLAUDE_AGENT_NAME env vars if stdin doesn't
+carry it. The env-var-only approach this script originally used had never
+been verified to actually populate in this harness.
 """
 from __future__ import annotations
 
@@ -29,6 +33,8 @@ import os
 import re
 import sys
 import tempfile
+import urllib.error
+import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -37,6 +43,13 @@ from pathlib import Path
 BRAIN_RAW = Path("/opt/openclaw/second-brain/raw")
 SESSION_DIR = Path(tempfile.gettempdir()) / "cortex-session-buffers"
 SESSION_DIR.mkdir(exist_ok=True)
+
+# SPEC-COS-16 — direct write path to CortexOS memory. Internal-only
+# (localhost, not the public Traefik route). Reads the shared write token
+# straight from the server-local .env rather than requiring every one of
+# 329 agent environments to have it individually exported.
+CORTEXOS_MEMORY_URL = "http://localhost:8200/api/v1/memory"
+CORTEXOS_ENV_FILE = Path("/opt/cortexos/.env")
 
 # Tools that carry knowledge worth capturing
 KNOWLEDGE_TOOLS = {
@@ -48,12 +61,43 @@ KNOWLEDGE_TOOLS = {
 SKIP_TOOLS = {"Read", "Glob", "Grep", "ScheduleWakeup", "AskUserQuestion"}
 
 
-def _session_id() -> str:
-    return os.environ.get("CLAUDE_SESSION_ID", "unknown-session")
+def _read_hook_stdin() -> dict:
+    """
+    Claude Code hooks receive a JSON payload on stdin (this is how
+    notify-mattermost.sh gets `.metadata.agent`/`.metadata.venture` — a
+    more reliable channel than the CLAUDE_AGENT_NAME env var, which per
+    this script's own original docstring is only set "if set in agent
+    config" — i.e. not guaranteed). Read once, defensively.
+    """
+    try:
+        if sys.stdin.isatty():
+            return {}
+        raw = sys.stdin.read()
+        if not raw.strip():
+            return {}
+        data = json.loads(raw)
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
 
 
-def _agent_name() -> str:
-    return os.environ.get("CLAUDE_AGENT_NAME", os.environ.get("USER", "unknown-agent"))
+def _session_id(hook_input: dict) -> str:
+    return (
+        hook_input.get("session_id")
+        or os.environ.get("CLAUDE_SESSION_ID")
+        or "unknown-session"
+    )
+
+
+def _agent_name(hook_input: dict) -> str:
+    metadata = hook_input.get("metadata") or {}
+    return (
+        metadata.get("agent")
+        or hook_input.get("agent_name")
+        or os.environ.get("CLAUDE_AGENT_NAME")
+        or os.environ.get("USER")
+        or "unknown-agent"
+    )
 
 
 def _venture_from_agent(agent_name: str) -> str:
@@ -119,39 +163,84 @@ def _extract_insight(tool_name: str, tool_input: dict, tool_result: str) -> str 
     return None
 
 
-def accumulate() -> None:
+def accumulate(hook_input: dict) -> None:
     """Add current tool call to session buffer."""
-    tool_name = os.environ.get("CLAUDE_TOOL_NAME", "")
+    tool_name = hook_input.get("tool_name") or os.environ.get("CLAUDE_TOOL_NAME", "")
     if not tool_name or not _is_knowledge_bearing(tool_name):
         return
 
-    try:
-        tool_input = json.loads(os.environ.get("CLAUDE_TOOL_INPUT", "{}"))
-    except json.JSONDecodeError:
-        tool_input = {}
+    tool_input = hook_input.get("tool_input")
+    if tool_input is None:
+        try:
+            tool_input = json.loads(os.environ.get("CLAUDE_TOOL_INPUT", "{}"))
+        except json.JSONDecodeError:
+            tool_input = {}
 
-    tool_result = os.environ.get("CLAUDE_TOOL_RESULT", "")
+    tool_result = hook_input.get("tool_response") or os.environ.get("CLAUDE_TOOL_RESULT", "")
     insight = _extract_insight(tool_name, tool_input, tool_result)
     if not insight:
         return
 
-    session_id = _session_id()
+    session_id = _session_id(hook_input)
     buffer_file = SESSION_DIR / f"{session_id}.jsonl"
     entry = {
         "ts": datetime.now(tz=timezone.utc).isoformat(),
         "tool": tool_name,
         "insight": insight,
-        "agent": _agent_name(),
+        "agent": _agent_name(hook_input),
     }
     with buffer_file.open("a") as f:
         f.write(json.dumps(entry) + "\n")
 
 
-def flush() -> None:
+def _agent_write_token() -> str | None:
+    try:
+        for line in CORTEXOS_ENV_FILE.read_text().splitlines():
+            if line.startswith("AGENT_WRITE_TOKEN="):
+                token = line.split("=", 1)[1].strip()
+                return token or None
+    except OSError:
+        pass
+    return None
+
+
+def _post_to_cortexos(agent_name: str, content: str) -> None:
+    """
+    Push the session summary straight into CortexOS memory. Best-effort —
+    a CortexOS outage must never break the agent session, so any failure
+    here is logged and swallowed. The file written by flush() above is the
+    fallback of record regardless of whether this succeeds.
+    """
+    token = _agent_write_token()
+    if not token:
+        return
+
+    body = json.dumps({
+        "content": content[:8000],
+        "memory_type": "episodic",
+        "category": "session-summary",
+    }).encode("utf-8")
+    req = urllib.request.Request(
+        CORTEXOS_MEMORY_URL,
+        data=body,
+        method="POST",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "X-Agent-Name": agent_name,
+            "Content-Type": "application/json",
+        },
+    )
+    try:
+        urllib.request.urlopen(req, timeout=5)
+    except (urllib.error.URLError, OSError) as exc:
+        print(f"agent-session-writer: cortexos write failed: {exc}", file=sys.stderr)
+
+
+def flush(hook_input: dict) -> None:
     """Write session buffer to second brain raw dir."""
-    session_id = _session_id()
-    agent_name = _agent_name()
-    venture = _venture_from_agent(agent_name)
+    session_id = _session_id(hook_input)
+    agent_name = _agent_name(hook_input)
+    venture = (hook_input.get("metadata") or {}).get("venture") or _venture_from_agent(agent_name)
     buffer_file = SESSION_DIR / f"{session_id}.jsonl"
 
     if not buffer_file.exists():
@@ -186,11 +275,16 @@ def flush() -> None:
     for e in entries:
         lines.append(f"- [{e['ts']}] {e['tool']}: {e['insight']}")
 
-    # Write to venture-scoped raw dir
+    summary_text = "\n".join(lines) + "\n"
+
+    # Write to venture-scoped raw dir (fallback of record)
     venture_raw = BRAIN_RAW / venture
     venture_raw.mkdir(parents=True, exist_ok=True)
     out_file = venture_raw / f"{agent_name}-{date_str}-{time_str}.md"
-    out_file.write_text("\n".join(lines) + "\n")
+    out_file.write_text(summary_text)
+
+    # SPEC-COS-16 — also write live, in addition to the file above.
+    _post_to_cortexos(agent_name, summary_text)
 
     # Cleanup buffer
     buffer_file.unlink(missing_ok=True)
@@ -202,10 +296,12 @@ def main() -> None:
                         help="Flush session buffer to second brain (call on Stop hook)")
     args = parser.parse_args()
 
+    hook_input = _read_hook_stdin()
+
     if args.flush:
-        flush()
+        flush(hook_input)
     else:
-        accumulate()
+        accumulate(hook_input)
 
 
 if __name__ == "__main__":

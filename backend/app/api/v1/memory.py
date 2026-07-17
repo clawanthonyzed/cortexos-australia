@@ -10,11 +10,13 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth.agent_auth import WriterContext, require_writer
 from app.auth.rbac import Permission, require_permission
 from app.dependencies import get_db, paginate
 from app.memory.manager import MemoryManager
 from app.models.memory_item import MemoryItem
 from app.models.user import User
+from app.models.venture import Venture
 from app.schemas.memory import (
     MemoryItemCreate,
     MemoryItemRead,
@@ -23,6 +25,7 @@ from app.schemas.memory import (
     MemorySearchResponse,
     MemorySearchResult,
 )
+from app.services.agent_write_guard import enforce_rate_limit, is_recent_duplicate
 
 logger = structlog.get_logger(__name__)
 router = APIRouter()
@@ -48,6 +51,8 @@ def _item_to_schema(item: MemoryItem) -> MemoryItemRead:
         access_count=item.access_count,
         agent_id=item.agent_id,
         user_id=item.user_id,
+        venture_id=item.venture_id,
+        source=item.source,
         external_id=item.external_id,
         created_at=item.created_at,
         updated_at=item.updated_at,
@@ -62,8 +67,10 @@ async def list_memory(
     agent_id: uuid.UUID | None = Query(None),
     memory_type: str | None = Query(None),
     category: str | None = Query(None),
+    search: str | None = Query(None),
 ) -> dict[str, Any]:
     """List memory items with pagination."""
+    from sqlalchemy import or_
     stmt = select(MemoryItem)
     if agent_id:
         stmt = stmt.where(MemoryItem.agent_id == agent_id)
@@ -71,6 +78,12 @@ async def list_memory(
         stmt = stmt.where(MemoryItem.memory_type == memory_type)
     if category:
         stmt = stmt.where(MemoryItem.category == category)
+    if search:
+        stmt = stmt.where(or_(
+            MemoryItem.summary.ilike(f"%{search}%"),
+            MemoryItem.content.ilike(f"%{search}%"),
+            MemoryItem.category.ilike(f"%{search}%"),
+        ))
 
     count_stmt = select(func.count()).select_from(stmt.subquery())
     total = (await db.execute(count_stmt)).scalar_one()
@@ -106,6 +119,22 @@ async def memory_stats(
     )
     by_type = {row.memory_type: row.cnt for row in type_rows}
 
+    from app.models.agent import Agent
+    agent_rows = await db.execute(
+        select(Agent.name, func.count(MemoryItem.id).label("cnt"))
+        .join(Agent, Agent.id == MemoryItem.agent_id)
+        .group_by(Agent.name)
+        .order_by(func.count(MemoryItem.id).desc())
+        .limit(50)
+    )
+    by_agent = [{"agent": row.name, "count": row.cnt} for row in agent_rows]
+
+    source_rows = await db.execute(
+        select(MemoryItem.source, func.count(MemoryItem.id).label("cnt"))
+        .group_by(MemoryItem.source)
+    )
+    by_source = {row.source: row.cnt for row in source_rows}
+
     oldest = (await db.execute(select(func.min(MemoryItem.created_at)))).scalar_one()
     newest = (await db.execute(select(func.max(MemoryItem.created_at)))).scalar_one()
 
@@ -113,7 +142,8 @@ async def memory_stats(
         "totalEntries": total,
         "totalSizeBytes": int(total_size),
         "byType": by_type,
-        "byAgent": [],
+        "byAgent": by_agent,
+        "bySource": by_source,
         "oldestEntryAt": oldest.isoformat() if oldest else None,
         "newestEntryAt": newest.isoformat() if newest else None,
     }
@@ -182,20 +212,72 @@ async def search_memory(
 async def create_memory(
     payload: MemoryItemCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_permission(Permission.MEMORY_WRITE)),
+    writer: WriterContext = Depends(require_writer(Permission.MEMORY_WRITE)),
 ) -> MemoryItemRead:
-    """Store a new memory item."""
-    manager = MemoryManager(db)
-    item = await manager.remember(
-        content=payload.content,
-        agent_id=str(payload.agent_id) if payload.agent_id else None,
-        user_id=str(payload.user_id) if payload.user_id else None,
-        memory_type=payload.memory_type,
-        category=payload.category,
-        tags=payload.tags,
-        importance=payload.importance_score,
-        persist_to_db=True,
-    )
+    """
+    Store a new memory item.
+
+    SPEC-COS-16: two callers land here — a human via the dashboard (User
+    JWT + MEMORY_WRITE role) or an agent via the shared internal write
+    token (X-Agent-Name header). Agent writes are rate-limited, loop-deduped,
+    and always stamped with the caller's own identity server-side — payload
+    agent_id/venture_slug are never trusted blindly for agent callers.
+    """
+    if writer.agent is not None:
+        agent = writer.agent
+        await enforce_rate_limit(agent.agent_id)
+
+        if await is_recent_duplicate(agent.agent_id, payload.content):
+            # Same agent wrote identical content within the dedupe window —
+            # a stuck loop, most likely. No-op rather than error: return the
+            # agent's most recent write so the caller still gets a 2xx.
+            existing = (await db.execute(
+                select(MemoryItem)
+                .where(MemoryItem.agent_id == uuid.UUID(agent.agent_id))
+                .order_by(MemoryItem.created_at.desc())
+                .limit(1)
+            )).scalar_one_or_none()
+            if existing:
+                return _item_to_schema(existing)
+
+        venture_id = agent.venture_id
+        if agent.is_specialist and payload.venture_slug:
+            v_result = await db.execute(
+                select(Venture).where(Venture.slug == payload.venture_slug)
+            )
+            venture = v_result.scalar_one_or_none()
+            if venture:
+                venture_id = str(venture.id)
+        # Non-specialist agents can never override venture_id — agent.venture_id
+        # (resolved from the agents table, not the request) always wins.
+
+        manager = MemoryManager(db)
+        item = await manager.remember(
+            content=payload.content,
+            agent_id=agent.agent_id,
+            user_id=None,
+            venture_id=venture_id,
+            memory_type=payload.memory_type,
+            category=payload.category,
+            tags=payload.tags,
+            importance=payload.importance_score,
+            source="agent_direct",
+            persist_to_db=True,
+        )
+    else:
+        manager = MemoryManager(db)
+        item = await manager.remember(
+            content=payload.content,
+            agent_id=str(payload.agent_id) if payload.agent_id else None,
+            user_id=str(payload.user_id) if payload.user_id else None,
+            memory_type=payload.memory_type,
+            category=payload.category,
+            tags=payload.tags,
+            importance=payload.importance_score,
+            source="dashboard",
+            persist_to_db=True,
+        )
+
     if not item:
         raise HTTPException(status_code=500, detail=_error("Failed to store memory"))
     return _item_to_schema(item)

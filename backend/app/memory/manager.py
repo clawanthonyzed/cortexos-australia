@@ -52,10 +52,12 @@ class MemoryManager:
         content: str,
         agent_id: str | None = None,
         user_id: str | None = None,
+        venture_id: str | None = None,
         memory_type: str = MemoryType.SHORT_TERM,
         category: str | None = None,
         tags: list[str] | None = None,
         importance: float = 0.5,
+        source: str = "dashboard",
         persist_to_db: bool = True,
     ) -> MemoryItem | None:
         """
@@ -92,11 +94,13 @@ class MemoryManager:
             importance_score=importance,
             agent_id=uuid.UUID(agent_id) if agent_id else None,
             user_id=uuid.UUID(user_id) if user_id else None,
+            venture_id=uuid.UUID(venture_id) if venture_id else None,
+            source=source,
             external_id=external_id,
         )
         self.db.add(item)
         await self.db.flush()
-        logger.debug("Memory stored", item_id=str(item.id), type=memory_type)
+        logger.debug("Memory stored", item_id=str(item.id), type=memory_type, source=source)
         return item
 
     async def recall(

@@ -17,7 +17,7 @@ mkdir -p "$BACKUP_DIR"
 echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] Starting backup..."
 
 # Check postgres is running
-if ! docker compose $COMPOSE_FILE ps postgres | grep -q "running"; then
+if ! docker compose $COMPOSE_FILE ps postgres | grep -Eq "Up|running"; then
   echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] ERROR: postgres container is not running."
   exit 1
 fi

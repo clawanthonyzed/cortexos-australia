@@ -70,5 +70,12 @@ class MemoryItem(Base, UUIDMixin, TimestampMixin):
     # External memory system reference (mem0 memory_id)
     external_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
 
+    # Write provenance — "dashboard" (human, via UI), "agent_direct"
+    # (SPEC-COS-16, agent-service-token write), "auto_ingest" (celery-beat
+    # scrapers). Defaults to "dashboard" for backward compat.
+    source: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="dashboard", server_default="dashboard", index=True
+    )
+
     def __repr__(self) -> str:
         return f"<MemoryItem {self.memory_type} | {self.content[:50]}>"

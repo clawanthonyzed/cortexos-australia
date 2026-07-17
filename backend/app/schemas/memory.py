@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 
 
 class MemoryItemCreate(BaseModel):
-    content: str = Field(..., min_length=1)
+    content: str = Field(..., min_length=1, max_length=8000)
     summary: str | None = None
     memory_type: str = Field(default="short_term")
     category: str | None = None
@@ -17,6 +17,10 @@ class MemoryItemCreate(BaseModel):
     importance_score: float = Field(default=0.5, ge=0.0, le=1.0)
     agent_id: uuid.UUID | None = None
     user_id: uuid.UUID | None = None
+    # SPEC-COS-16 — specialist-only cross-venture override. Ignored for
+    # venture-scoped agents and for dashboard (User JWT) callers; the API
+    # layer stamps venture_id from the caller's own identity in those cases.
+    venture_slug: str | None = None
 
 
 class MemoryItemUpdate(BaseModel):
@@ -39,6 +43,8 @@ class MemoryItemRead(BaseModel):
     access_count: int
     agent_id: uuid.UUID | None
     user_id: uuid.UUID | None
+    venture_id: uuid.UUID | None = None
+    source: str = "dashboard"
     external_id: str | None
     created_at: datetime
     updated_at: datetime

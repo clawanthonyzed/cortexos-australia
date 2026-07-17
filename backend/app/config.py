@@ -40,6 +40,13 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 30
     refresh_token_expire_days: int = 7
 
+    # SPEC-COS-16 — shared internal token for direct agent memory/KG writes.
+    # Internal-network-only (never routed through public Traefik). Empty
+    # string disables the agent-write path entirely.
+    agent_write_token: str = ""
+    agent_write_rate_limit_per_hour: int = 60
+    agent_write_dedupe_window_seconds: int = 300
+
     # ── CORS ──────────────────────────────────────────────────────────────────
     cors_origins: list[str] = ["http://localhost:3000", "http://localhost:5173"]
 
