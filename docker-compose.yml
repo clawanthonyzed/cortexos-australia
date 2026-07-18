@@ -26,9 +26,16 @@ services:
 
   neo4j:
     image: neo4j:5.24
+    restart: unless-stopped
+    mem_limit: 700m
     environment:
       NEO4J_AUTH: neo4j/${NEO4J_PASSWORD}
       NEO4J_PLUGINS: '["apoc"]'
+      # Capped heap — server has tight RAM headroom (SPEC-COS-16 incident,
+      # 2026-07-18). Defaults would try to claim far more than this box has.
+      NEO4J_server_memory_heap_initial__size: 300m
+      NEO4J_server_memory_heap_max__size: 300m
+      NEO4J_server_memory_pagecache_size: 200m
     volumes:
       - neo4j_data:/data
     healthcheck:

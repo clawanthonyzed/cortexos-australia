@@ -57,7 +57,16 @@ class GraphitiClient:
             return False
         try:
             from graphiti_core.nodes import EpisodeType  # type: ignore[import]
-            ep_type = getattr(EpisodeType, episode_type.upper(), EpisodeType.TEXT)
+            # EpisodeType is a value-based enum with lowercase members
+            # (text/json/message) — EpisodeType.TEXT never existed, and the
+            # installed graphiti-core's add_episode() takes `source=`, not
+            # `episode_type=`. Neither bug was ever exercised before because
+            # Neo4j wasn't deployed until now (SPEC-COS-16, 2026-07-18), so
+            # this path never actually ran.
+            try:
+                ep_type = EpisodeType(episode_type.lower())
+            except ValueError:
+                ep_type = EpisodeType.text
             ref_time = reference_time or datetime.now(tz=timezone.utc)
 
             await client.add_episode(
@@ -65,7 +74,7 @@ class GraphitiClient:
                 episode_body=content,
                 source_description=source_description,
                 reference_time=ref_time,
-                episode_type=ep_type,
+                source=ep_type,
                 group_id=group_id,
             )
             return True
