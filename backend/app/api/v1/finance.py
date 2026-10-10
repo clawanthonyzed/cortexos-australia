@@ -286,6 +286,39 @@ async def trigger_revenue_sync(
     return {"inserted": inserted, "message": f"Synced {inserted} new revenue records from Gumroad"}
 
 
+@router.get("/budgets", tags=["finance"])
+async def venture_budgets(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_permission(Permission.FINANCE_READ)),
+) -> dict[str, Any]:
+    """This month's spend vs limit per venture, straight from the Spending Gate's own
+    budgets.json (the gate is what actually enforces these limits). Added 2026-10-10."""
+    import json as _json
+    from pathlib import Path
+    from app.models.venture import Venture
+
+    path = Path("/opt/openclaw/logs/spending_gate_budgets.json")  # 644 copy published every 15 min by sync_costs_to_cortexos.py
+    if not path.is_file():
+        return {"month": None, "global_enabled": None, "ventures": []}
+    raw = _json.loads(path.read_text())
+    alias = {"bloom-and-bub": "bloom-bub", "gtt-center-perth": "gtt-perth",
+             "cortexos-australia": "agentic-os", "cortexos": "agentic-os"}
+    names = dict((await db.execute(select(Venture.slug, Venture.name))).all())
+    items = []
+    for key, v in (raw.get("ventures") or {}).items():
+        limit = float(v.get("monthly_limit_usd") or 0)
+        spent = float(v.get("spent_usd") or 0)
+        items.append({
+            "key": key,
+            "name": "Default (all other ventures)" if key == "_default" else names.get(alias.get(key, key), key),
+            "limit_usd": limit,
+            "spent_usd": round(spent, 6),
+            "percent": round(100 * spent / limit, 1) if limit else None,
+        })
+    items.sort(key=lambda i: -(i["percent"] or 0))
+    return {"month": raw.get("month"), "global_enabled": raw.get("global_enabled"), "ventures": items}
+
+
 @router.get("/forecast", tags=["finance"])
 async def revenue_forecast(
     current_user: User = Depends(require_permission(Permission.FINANCE_READ)),

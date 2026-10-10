@@ -95,7 +95,8 @@ export default function OrgChartPage() {
   const [selected, setSelected] = useState<string | null>(null);
   const [query, setQuery] = useState("");
 
-  const agents = useMemo(() => data?.agents ?? [], [data]);
+  // archived agents (e.g. qc-cudan-studio, 2026-10-10) stay in the DB for history but leave the chart
+  const agents = useMemo(() => (data?.agents ?? []).filter((a) => (a.status as string) !== "archived"), [data]);
   const byTier = useMemo(() => {
     const g: Record<string, Agent[]> = { consultant: [], manager: [], worker: [] };
     for (const a of agents) (g[a.roleTier] ?? g.worker).push(a);

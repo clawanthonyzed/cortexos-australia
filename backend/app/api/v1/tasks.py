@@ -33,6 +33,15 @@ logger = structlog.get_logger(__name__)
 router = APIRouter()
 
 
+def _deliverable(task: Task) -> str | None:
+    """Link to the finished work, when a run recorded one in result_json."""
+    try:
+        data = json.loads(task.result_json or "null")
+    except ValueError:
+        return None
+    return data.get("deliverable") if isinstance(data, dict) else None
+
+
 def _task_read(task: Task) -> TaskRead:
     """TaskRead from a Task row. input_data/result_json are TEXT columns holding JSON, so
     model_validate(task) failed for every single-task response (found 2026-10-10)."""
@@ -83,7 +92,8 @@ async def list_tasks(
     names = dict((await db.execute(select(Agent.id, Agent.name).where(Agent.id.in_(agent_ids)))).all()) if agent_ids else {}
 
     return {
-        "items": [{**TaskReadBrief.model_validate(t).model_dump(mode="json"), "agent_name": names.get(t.agent_id)} for t in tasks],
+        "items": [{**TaskReadBrief.model_validate(t).model_dump(mode="json"), "agent_name": names.get(t.agent_id),
+                   "deliverable": _deliverable(t)} for t in tasks],
         "total": total,
         "page": pagination["page"],
         "page_size": pagination["page_size"],

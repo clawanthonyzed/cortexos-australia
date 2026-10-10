@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { VentureCockpit } from "@/components/ventures/venture-cockpit";
 
 interface Venture {
   id: string;
@@ -106,8 +107,8 @@ export default function VentureDetailPage() {
       icon: <MessageSquareIcon className="h-4 w-4" />,
     },
     {
-      label: "Plane Project",
-      url: `https://dash.anthonyzed.work/plane`,
+      label: "Tasks Board",
+      url: `https://dash.anthonyzed.work/tasks`,
       icon: <TrelloIcon className="h-4 w-4" />,
     },
   ];
@@ -142,6 +143,9 @@ export default function VentureDetailPage() {
             </div>
           </div>
         </div>
+
+        {/* Cockpit: run work for this venture */}
+        <VentureCockpit slug={venture.slug} name={venture.name} />
 
         {/* Agents */}
         <div className="rounded-xl border border-cortex-border bg-cortex-surface overflow-hidden">
