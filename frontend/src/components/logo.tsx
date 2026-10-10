@@ -17,6 +17,6 @@ export const Logo = (props: React.ComponentProps<"svg">) => (
   <svg viewBox="0 0 100 24" fill="none" {...props}>
     <polygon points="12 2 22 7 22 17 12 22 2 17 2 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
     <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.5" />
-    <text x="28" y="17" fontFamily="system-ui, sans-serif" fontWeight="600" fontSize="13" fill="currentColor">CortexOS</text>
+    <text x="28" y="17" fontFamily="system-ui, sans-serif" fontWeight="600" fontSize="13" fill="currentColor">EmpireOS</text>
   </svg>
 );

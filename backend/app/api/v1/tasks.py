@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.agents.executor import AgentExecutor
 from app.auth.rbac import Permission, require_permission
 from app.dependencies import get_db, paginate
+from app.models.agent import Agent
 from app.models.task import Task, TaskStatus
 from app.models.user import User
 from app.schemas.task import (
@@ -30,6 +31,20 @@ from app.schemas.task import (
 
 logger = structlog.get_logger(__name__)
 router = APIRouter()
+
+
+def _task_read(task: Task) -> TaskRead:
+    """TaskRead from a Task row. input_data/result_json are TEXT columns holding JSON, so
+    model_validate(task) failed for every single-task response (found 2026-10-10)."""
+    d = {a.key: getattr(task, a.key) for a in Task.__mapper__.column_attrs}
+    for field, empty in (("input_data", {}), ("result_json", None)):
+        v = d.get(field)
+        if isinstance(v, str):
+            try:
+                d[field] = json.loads(v) if v.strip() else empty
+            except ValueError:
+                d[field] = empty
+    return TaskRead.model_validate(d)
 
 
 def _error(msg: str, detail: Any = None) -> dict[str, Any]:
@@ -63,8 +78,12 @@ async def list_tasks(
     result = await db.execute(stmt)
     tasks = result.scalars().all()
 
+    # The board shows who owns each task; resolve agent names in one query.
+    agent_ids = {t.agent_id for t in tasks if t.agent_id}
+    names = dict((await db.execute(select(Agent.id, Agent.name).where(Agent.id.in_(agent_ids)))).all()) if agent_ids else {}
+
     return {
-        "items": [TaskReadBrief.model_validate(t) for t in tasks],
+        "items": [{**TaskReadBrief.model_validate(t).model_dump(mode="json"), "agent_name": names.get(t.agent_id)} for t in tasks],
         "total": total,
         "page": pagination["page"],
         "page_size": pagination["page_size"],
@@ -92,7 +111,7 @@ async def create_task(
     db.add(task)
     await db.flush()
     await db.refresh(task)
-    return TaskRead.model_validate(task)
+    return _task_read(task)
 
 
 @router.get("/stats", response_model=dict[str, Any], tags=["tasks"])
@@ -145,6 +164,61 @@ async def task_stats(
     }
 
 
+@router.post("/{task_id}/status", response_model=TaskRead, tags=["tasks"])
+async def set_task_board_status(
+    task_id: uuid.UUID,
+    payload: dict[str, Any],
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_permission(Permission.TASK_UPDATE)),
+) -> TaskRead:
+    """Tick a task done (or reopen it) from the Tasks board. Never touches a running task."""
+    from datetime import timezone
+    new_status = str(payload.get("status", "")).lower()
+    if new_status not in (TaskStatus.COMPLETED, TaskStatus.PENDING):
+        raise HTTPException(status_code=422, detail=_error("status must be 'completed' or 'pending'"))
+    task = await db.get(Task, task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail=_error("Task not found"))
+    if task.status == TaskStatus.RUNNING:
+        raise HTTPException(status_code=409, detail=_error("Task is running; cancel it first"))
+    task.status = new_status
+    task.completed_at = datetime.now(timezone.utc) if new_status == TaskStatus.COMPLETED else None
+    await db.flush()
+    await db.refresh(task)
+    return _task_read(task)
+
+
+@router.post("/{task_id}/comments", response_model=TaskRead, tags=["tasks"])
+async def add_task_comment(
+    task_id: uuid.UUID,
+    payload: dict[str, Any],
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_permission(Permission.TASK_UPDATE)),
+) -> TaskRead:
+    """Add a note to a task. Stored in the task's input_data under "comments"."""
+    from datetime import timezone
+    text = str(payload.get("text", "")).strip()
+    if not text:
+        raise HTTPException(status_code=422, detail=_error("Comment text is required"))
+    task = await db.get(Task, task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail=_error("Task not found"))
+    try:
+        data = json.loads(task.input_data or "{}")
+        data = data if isinstance(data, dict) else {}
+    except ValueError:
+        data = {}
+    data.setdefault("comments", []).append({
+        "text": text[:4000],
+        "author": getattr(current_user, "username", None) or getattr(current_user, "email", None) or "anthony",
+        "at": datetime.now(timezone.utc).isoformat(),
+    })
+    task.input_data = json.dumps(data)
+    await db.flush()
+    await db.refresh(task)
+    return _task_read(task)
+
+
 @router.get("/{task_id}", response_model=TaskRead, tags=["tasks"])
 async def get_task(
     task_id: uuid.UUID,
@@ -155,7 +229,7 @@ async def get_task(
     task = await db.get(Task, task_id)
     if not task:
         raise HTTPException(status_code=404, detail=_error("Task not found"))
-    return TaskRead.model_validate(task)
+    return _task_read(task)
 
 
 @router.patch("/{task_id}", response_model=TaskRead, tags=["tasks"])
@@ -185,7 +259,7 @@ async def update_task(
 
     await db.flush()
     await db.refresh(task)
-    return TaskRead.model_validate(task)
+    return _task_read(task)
 
 
 @router.delete("/{task_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None, tags=["tasks"])
@@ -277,7 +351,7 @@ async def cancel_task(
     task.status = TaskStatus.CANCELLED
     await db.flush()
     await db.refresh(task)
-    return TaskRead.model_validate(task)
+    return _task_read(task)
 
 
 @router.post("/{task_id}/retry", response_model=TaskRead, tags=["tasks"])
@@ -311,7 +385,7 @@ async def retry_task(
     task.celery_task_id = celery_result.id
     await db.flush()
     await db.refresh(task)
-    return TaskRead.model_validate(task)
+    return _task_read(task)
 
 
 @router.get("/{task_id}/stream", tags=["tasks"])

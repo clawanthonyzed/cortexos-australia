@@ -3,8 +3,9 @@
 import { useState } from "react";
 import {
   CheckCircle2, XCircle, Loader2, Clock, Pause, Circle,
-  StopCircle, RotateCcw, ChevronRight
+  StopCircle, RotateCcw, ChevronRight, Check
 } from "lucide-react";
+import { apiClient } from "@/lib/api";
 import type { Task } from "@/types/task";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -68,6 +69,19 @@ export function TaskRow({ task, onSelect }: TaskRowProps) {
     }
   };
 
+  const done = task.status === "completed";
+  const canTick = task.status !== "running" && task.status !== "retrying";
+  const toggleDone = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await apiClient.post(`/tasks/${task.id}/status`, { status: done ? "pending" : "completed" });
+      await mutate((key: unknown) => typeof key === "string" && key.startsWith("/tasks"));
+      toast.success(done ? "Task reopened" : "Task marked done");
+    } catch {
+      toast.error("Couldn't update the task");
+    }
+  };
+
   return (
     <div
       className={cn(
@@ -80,18 +94,28 @@ export function TaskRow({ task, onSelect }: TaskRowProps) {
       }}
     >
       <div className="flex items-center gap-3 px-4 py-3">
-        {/* Status icon */}
-        <Icon
-          className={cn(
-            "h-4 w-4 flex-shrink-0",
-            statusCfg.color,
-            task.status === "running" && "animate-spin"
-          )}
-        />
+        {/* Status: tickable checkbox, or a spinner while the task is running */}
+        {canTick ? (
+          <button
+            type="button"
+            role="checkbox"
+            aria-checked={done}
+            aria-label={done ? "Reopen task" : "Mark task done"}
+            onClick={toggleDone}
+            className={cn(
+              "flex h-[18px] w-[18px] flex-shrink-0 items-center justify-center rounded border transition-colors",
+              done ? "border-cortex-success bg-cortex-success text-white" : "border-cortex-muted/60 hover:border-cortex-success"
+            )}
+          >
+            {done && <Check className="h-3 w-3" />}
+          </button>
+        ) : (
+          <Icon className={cn("h-4 w-4 flex-shrink-0", statusCfg.color, "animate-spin")} />
+        )}
 
         {/* Title & agent */}
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-cortex-text truncate">{task.title}</p>
+          <p className={cn("text-sm font-medium truncate", done ? "text-cortex-muted line-through" : "text-cortex-text")}>{task.title}</p>
           <p className="text-xs text-cortex-muted">
             {task.agentName ?? "Unassigned"} · {formatRelativeTime(task.queuedAt)}
           </p>
@@ -114,7 +138,7 @@ export function TaskRow({ task, onSelect }: TaskRowProps) {
 
         {/* Cost */}
         <span className="hidden md:block text-xs font-mono text-cortex-muted w-16 text-right">
-          {task.costUsd > 0 ? formatCurrency(task.costUsd, "USD") : "-"}
+          {task.costUsd > 0 ? formatCurrency(task.costUsd, "AUD") : "-"}
         </span>
 
         {/* Priority */}

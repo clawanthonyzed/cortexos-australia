@@ -58,7 +58,7 @@ export function formatCompactCurrency(
 ) {
 	const { maximumFractionDigits = 0 } = options ?? {};
 	return new Intl.NumberFormat(DASHBOARD_LOCALE, {
-		currency: "USD",
+		currency: "AUD",
 		maximumFractionDigits,
 		notation: "compact",
 		style: "currency",
@@ -68,7 +68,7 @@ export function formatCompactCurrency(
 /** Full-precision USD (e.g. average order value). */
 export function formatFullCurrency(value: number) {
 	return new Intl.NumberFormat(DASHBOARD_LOCALE, {
-		currency: "USD",
+		currency: "AUD",
 		minimumFractionDigits: 2,
 		maximumFractionDigits: 2,
 		style: "currency",

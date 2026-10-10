@@ -6,7 +6,7 @@ from typing import Any
 
 import structlog
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import func, select
+from sqlalchemy import func, literal_column, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.rbac import Permission, require_permission
@@ -110,14 +110,15 @@ async def finance_dashboard(
     profit = total_revenue - total_cost_aud
 
     # Daily cost breakdown for revenue_history chart
+    day_col = func.date_trunc(literal_column("'day'"), CostRecord.created_at)
     daily_rows = await db.execute(
         select(
-            func.date_trunc("day", CostRecord.created_at).label("day"),
+            day_col.label("day"),
             func.sum(CostRecord.cost_usd).label("daily_cost"),
         )
         .where(CostRecord.created_at >= start_dt)
-        .group_by(func.date_trunc("day", CostRecord.created_at))
-        .order_by(func.date_trunc("day", CostRecord.created_at))
+        .group_by(day_col)
+        .order_by(day_col)
     )
     daily_costs: dict[str, float] = {
         row.day.date().isoformat(): float(row.daily_cost or 0)
@@ -193,17 +194,18 @@ async def monthly_summary(
     months: int = Query(default=6, ge=1, le=24),
 ) -> dict[str, Any]:
     """Monthly cost breakdown for the past N months."""
+    month_col = func.to_char(CostRecord.created_at, literal_column("'YYYY-MM'"))
     rows = await db.execute(
         select(
-            func.to_char(CostRecord.created_at, "YYYY-MM").label("month"),
+            month_col.label("month"),
             func.sum(CostRecord.cost_usd).label("cost_usd"),
             func.sum(CostRecord.total_tokens).label("tokens"),
         )
         .where(
             CostRecord.created_at >= datetime.now(tz=timezone.utc) - timedelta(days=months * 31)
         )
-        .group_by(func.to_char(CostRecord.created_at, "YYYY-MM"))
-        .order_by(func.to_char(CostRecord.created_at, "YYYY-MM").desc())
+        .group_by(month_col)
+        .order_by(month_col.desc())
         .limit(months)
     )
 

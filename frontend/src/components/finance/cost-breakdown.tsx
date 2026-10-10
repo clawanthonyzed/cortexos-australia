@@ -29,7 +29,7 @@ function CustomTooltip({ active, payload }: {
     <div className="rounded-lg border border-cortex-border bg-cortex-surface px-3 py-2 shadow-xl">
       <p className="text-xs font-medium text-cortex-text mb-1">{d.model}</p>
       <p className="text-xs text-cortex-muted">{d.provider}</p>
-      <p className="text-xs font-mono text-cortex-text">{formatCurrency(d.costUsd, "USD")}</p>
+      <p className="text-xs font-mono text-cortex-text">{formatCurrency(d.costUsd, "AUD")}</p>
       <p className="text-[11px] text-cortex-muted">{formatTokens(d.tokensUsed)} tokens · {d.requestCount} requests</p>
     </div>
   );

@@ -199,7 +199,7 @@ export function WorkflowBuilder({ workflow }: WorkflowBuilderProps) {
   };
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full w-full min-w-0 flex-1 flex-col">
       {/* Builder top bar */}
       <div className="flex items-center gap-3 border-b border-cortex-border bg-cortex-surface px-4 py-2 flex-shrink-0">
         <Link

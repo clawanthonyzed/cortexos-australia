@@ -51,6 +51,9 @@ export function AgentCard({ agent }: AgentCardProps) {
   const { trigger: doAction, isMutating: actionLoading } = useAgentAction(agent.id);
   const { trigger: doDelete, isMutating: deleteLoading } = useDeleteAgent(agent.id);
 
+  // First tag is the venture slug
+  const venture = agent.tags && agent.tags.length > 0 ? agent.tags[0] : null;
+
   const handleAction = async (action: "start" | "stop" | "pause") => {
     try {
       await doAction(action);
@@ -140,6 +143,15 @@ export function AgentCard({ agent }: AgentCardProps) {
           </div>
         </div>
 
+        {/* Venture badge */}
+        {venture && (
+          <div className="mb-2">
+            <Badge variant="accent" className="text-[10px] py-0 px-1.5 font-mono">
+              {venture}
+            </Badge>
+          </div>
+        )}
+
         {/* Current task */}
         {agent.currentTask && (
           <div className="mb-3 rounded-md bg-cortex-border/40 px-2.5 py-1.5">
@@ -160,7 +172,7 @@ export function AgentCard({ agent }: AgentCardProps) {
           <div className="flex flex-col items-center rounded-md bg-cortex-border/30 py-1.5 px-1">
             <DollarSign className="h-3 w-3 text-cortex-warning mb-0.5" />
             <span className="text-xs font-mono font-semibold text-cortex-text">
-              {formatCurrency(agent.metrics.totalCostUsd, "USD", true)}
+              {formatCurrency(agent.metrics.totalCostUsd, "AUD", true)}
             </span>
             <span className="text-[9px] text-cortex-muted uppercase">Cost</span>
           </div>
@@ -181,9 +193,8 @@ export function AgentCard({ agent }: AgentCardProps) {
               : "Never run"}
           </span>
 
-          {/* Action buttons */}
           <div className="flex items-center gap-1">
-            {agent.status === "idle" || agent.status === "stopped" || agent.status === "error" ? (
+            {(agent.status === "idle" || agent.status === "stopped" || agent.status === "error") && (
               <Button
                 size="icon-sm"
                 variant="ghost"
@@ -194,7 +205,7 @@ export function AgentCard({ agent }: AgentCardProps) {
               >
                 <Play className="h-3.5 w-3.5" />
               </Button>
-            ) : null}
+            )}
 
             {agent.status === "running" && (
               <>

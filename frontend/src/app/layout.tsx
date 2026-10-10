@@ -4,8 +4,8 @@ import { Toaster } from "sonner";
 
 export const metadata: Metadata = {
   title: {
-    default: "CortexOS",
-    template: "%s | CortexOS",
+    default: "EmpireOS",
+    template: "%s | EmpireOS",
   },
   description: "Agentic Operating System — Command Center for AI-driven ventures",
   icons: {

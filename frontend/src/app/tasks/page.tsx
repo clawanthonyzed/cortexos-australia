@@ -4,6 +4,8 @@ import { useState } from "react";
 import { Plus, Search, Filter, ListTodo, RefreshCw } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { TaskRow } from "@/components/tasks/task-row";
+import { TaskDetailSheet } from "@/components/tasks/task-detail-sheet";
+import type { Task } from "@/types/task";
 import { TaskForm } from "@/components/tasks/task-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,6 +31,7 @@ import { mutate } from "swr";
 
 export default function TasksPage() {
   const [createOpen, setCreateOpen] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<TaskStatus | "all">("all");
   const [page, setPage] = useState(1);
@@ -164,7 +167,7 @@ export default function TasksPage() {
           ) : (
             <div>
               {tasks.map((task) => (
-                <TaskRow key={task.id} task={task} />
+                <TaskRow key={task.id} task={task} onSelect={setSelectedTask} />
               ))}
             </div>
           )}
@@ -210,6 +213,7 @@ export default function TasksPage() {
           />
         </DialogContent>
       </Dialog>
+      <TaskDetailSheet task={selectedTask} onClose={() => setSelectedTask(null)} />
     </AppShell>
   );
 }

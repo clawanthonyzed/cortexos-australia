@@ -95,10 +95,22 @@ async def login(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> TokenResponse:
-    """Authenticate and return access + refresh tokens."""
+    """Authenticate and return access + refresh tokens. Accepts either email
+    or a plain username (added 2026-10-08 -- EmailStr was hard-rejecting a
+    bare username like "anthony" before the request ever reached this DB
+    lookup)."""
+    if not payload.email and not payload.username:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={"error": "Provide either email or username"},
+        )
+
+    identifier_clause = (
+        User.email == payload.email if payload.email else User.username == payload.username
+    )
     result = await db.execute(
         select(User)
-        .where(User.email == payload.email)
+        .where(identifier_clause)
         .options(selectinload(User.user_roles).selectinload(UserRole.role))
     )
     user = result.scalar_one_or_none()

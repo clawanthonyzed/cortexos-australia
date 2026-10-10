@@ -69,7 +69,7 @@ export default function FinancePage() {
             },
             {
               label: "Costs (MTD)",
-              value: isLoading ? null : formatCurrency(totalCost, "USD"),
+              value: isLoading ? null : formatCurrency(totalCost, "AUD"),
               icon: TrendingUp,
             },
             {
@@ -175,7 +175,7 @@ export default function FinancePage() {
                   <tr>
                     <th className="text-left px-4 py-2 text-xs font-semibold uppercase tracking-wider text-cortex-muted">Model</th>
                     <th className="text-right px-4 py-2 text-xs font-semibold uppercase tracking-wider text-cortex-muted">Tokens</th>
-                    <th className="text-right px-4 py-2 text-xs font-semibold uppercase tracking-wider text-cortex-muted">Cost (USD)</th>
+                    <th className="text-right px-4 py-2 text-xs font-semibold uppercase tracking-wider text-cortex-muted">Cost (AUD)</th>
                     <th className="text-right px-4 py-2 text-xs font-semibold uppercase tracking-wider text-cortex-muted">% of Total</th>
                   </tr>
                 </thead>
@@ -186,7 +186,7 @@ export default function FinancePage() {
                         <span className="text-cortex-muted text-xs mr-1">{t.provider}/</span>{t.model}
                       </td>
                       <td className="px-4 py-2.5 text-right font-mono text-cortex-muted">{formatTokens(t.total_tokens)}</td>
-                      <td className="px-4 py-2.5 text-right font-mono text-cortex-text">{formatCurrency(t.cost_usd, "USD")}</td>
+                      <td className="px-4 py-2.5 text-right font-mono text-cortex-text">{formatCurrency(t.cost_usd, "AUD")}</td>
                       <td className="px-4 py-2.5 text-right font-mono text-cortex-muted">{t.percent_of_total.toFixed(1)}%</td>
                     </tr>
                   ))}

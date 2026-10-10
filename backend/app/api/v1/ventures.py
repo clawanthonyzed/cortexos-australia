@@ -121,3 +121,23 @@ async def list_ventures_from_registry(
         "source": "registry.json",
         "built": data.get("built"),
     }
+
+
+# 2026-10-10: the Ventures page links every card to /ventures/{id}, but this route never
+# existed, so every click showed "failed to load venture". Accepts the UUID or the slug.
+# Declared last so it can't shadow /registry or /{id}/health.
+@router.get("/{venture_ref}", response_model=VentureRead, tags=["ventures"])
+async def get_venture(
+    venture_ref: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_permission(Permission.VENTURE_READ)),
+) -> VentureRead:
+    try:
+        cond = Venture.id == uuid.UUID(venture_ref)
+    except ValueError:
+        cond = Venture.slug == venture_ref
+    venture = (await db.execute(select(Venture).where(cond))).scalar_one_or_none()
+    if venture is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_error("Venture not found"))
+    return VentureRead.model_validate(venture)
+

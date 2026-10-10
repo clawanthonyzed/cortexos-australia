@@ -12,6 +12,7 @@ interface TaskBrief {
   status: string;
   priority: number;
   agent_id: string | null;
+  agent_name?: string | null;
   created_at: string;
 }
 
@@ -62,7 +63,7 @@ function adaptTaskBrief(b: TaskBrief): Task {
     status: b.status as Task["status"],
     priority: intToPriority(b.priority),
     agentId: b.agent_id,
-    agentName: null,
+    agentName: b.agent_name ?? null,
     workflowId: null,
     venture: null,
     tags: [],

@@ -9,6 +9,7 @@ from app.models.cost_record import CostRecord
 from app.models.audit_log import AuditLog
 from app.models.revenue_record import RevenueRecord, RevenueSource
 from app.models.venture import Venture
+from app.models.research_action import ResearchAction, ActionStatus
 
 __all__ = [
     "User",
@@ -33,4 +34,6 @@ __all__ = [
     "RevenueRecord",
     "RevenueSource",
     "Venture",
+    "ResearchAction",
+    "ActionStatus",
 ]

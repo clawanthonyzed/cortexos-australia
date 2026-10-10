@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { GitFork, Play, Trash2, MoreVertical, CheckCircle2, XCircle } from "lucide-react";
+import { GitFork, Play, Trash2, MoreVertical, CheckCircle2, XCircle, Tag } from "lucide-react";
 import type { Workflow } from "@/types/workflow";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -102,11 +102,22 @@ export function WorkflowCard({ workflow }: WorkflowCardProps) {
         </div>
       </div>
 
+      {/* Venture badge */}
+      {workflow.venture && (
+        <div className="mb-2 flex items-center gap-1">
+          <Tag className="h-3 w-3 text-cortex-muted" />
+          <Badge variant="accent" className="text-[10px] py-0 px-1.5 font-mono">
+            {workflow.venture}
+          </Badge>
+        </div>
+      )}
+
       {/* Stats */}
       <div className="flex gap-4 mb-3 text-xs text-cortex-muted">
         <span>{nodeCount} nodes</span>
         <span>{agentNodes} agents</span>
         <span>{workflow.runCount} runs</span>
+        <span className="capitalize text-cortex-accent/70">{workflow.triggerType}</span>
         {workflow.lastRunStatus && (
           <span className={cn(
             "flex items-center gap-1",

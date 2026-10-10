@@ -9,9 +9,14 @@ const WORKFLOWS_KEY = "/workflows";
 interface WorkflowBrief {
   id: string;
   name: string;
+  description: string | null;
   status: string;
   trigger_type: string;
   run_count: number;
+  venture: string | null;
+  tags: string[];
+  last_run_at: string | null;
+  last_run_status: string | null;
   created_at: string;
 }
 
@@ -24,6 +29,10 @@ interface WorkflowFull {
   run_count: number;
   success_count: number;
   failure_count: number;
+  venture: string | null;
+  tags: string[];
+  last_run_at: string | null;
+  last_run_status: string | null;
   graph_json: {
     nodes?: WorkflowNode[];
     edges?: WorkflowEdge[];
@@ -56,15 +65,16 @@ function adaptBrief(b: WorkflowBrief): Workflow {
   return {
     id: b.id,
     name: b.name,
-    description: "",
+    description: b.description ?? "",
     status: b.status as Workflow["status"],
-    venture: null,
-    tags: [],
+    triggerType: b.trigger_type,
+    venture: b.venture ?? null,
+    tags: b.tags ?? [],
     nodes: [],
     edges: [],
     runCount: b.run_count,
-    lastRunAt: null,
-    lastRunStatus: null,
+    lastRunAt: b.last_run_at ?? null,
+    lastRunStatus: (b.last_run_status as Workflow["lastRunStatus"]) ?? null,
     avgDurationMs: null,
     createdAt: b.created_at,
     updatedAt: b.created_at,
@@ -77,13 +87,14 @@ function adaptFull(b: WorkflowFull): Workflow {
     name: b.name,
     description: b.description ?? "",
     status: b.status as Workflow["status"],
-    venture: null,
-    tags: [],
+    triggerType: b.trigger_type,
+    venture: b.venture ?? null,
+    tags: b.tags ?? [],
     nodes: b.graph_json?.nodes ?? [],
     edges: b.graph_json?.edges ?? [],
     runCount: b.run_count,
-    lastRunAt: null,
-    lastRunStatus: b.failure_count > 0 ? "failed" : b.success_count > 0 ? "completed" : null,
+    lastRunAt: b.last_run_at ?? null,
+    lastRunStatus: b.last_run_status ? (b.last_run_status as Workflow["lastRunStatus"]) : b.failure_count > 0 ? "failed" : b.success_count > 0 ? "completed" : null,
     avgDurationMs: null,
     createdAt: b.created_at,
     updatedAt: b.updated_at,

@@ -13,6 +13,9 @@ import {
   HelpCircleIcon,
   ActivityIcon,
   KeyIcon,
+  Building2Icon,
+  ClipboardListIcon,
+  WalletIcon,
 } from "lucide-react";
 
 export type SidebarNavItem = {
@@ -37,6 +40,23 @@ export const navGroups: SidebarNavGroup[] = [
         icon: <LayoutDashboardIcon />,
         isActive: true,
       },
+      {
+        title: "Org Chart",
+        path: "/org-chart",
+        icon: <NetworkIcon />,
+      },
+      {
+        // Option B (2026-10-10): EmpireOS's own task view, promoted next to Org Chart
+        title: "Tasks",
+        path: "/tasks",
+        icon: <ClipboardListIcon />,
+      },
+      {
+        // 2026-10-10: promoted from Commerce so it sits with the primary tabs
+        title: "Finance",
+        path: "/finance",
+        icon: <WalletIcon />,
+      },
     ],
   },
   {
@@ -48,9 +68,9 @@ export const navGroups: SidebarNavGroup[] = [
         icon: <BotIcon />,
       },
       {
-        title: "Tasks",
-        path: "/tasks",
-        icon: <ListChecksIcon />,
+        title: "Ventures",
+        path: "/ventures",
+        icon: <Building2Icon />,
       },
       {
         title: "Workflows",
@@ -86,11 +106,6 @@ export const navGroups: SidebarNavGroup[] = [
         title: "Products",
         path: "/products",
         icon: <ShoppingBagIcon />,
-      },
-      {
-        title: "Finance",
-        path: "/finance",
-        icon: <DollarSignIcon />,
       },
     ],
   },

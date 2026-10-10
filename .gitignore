@@ -160,3 +160,9 @@ backend/alembic/versions/__pycache__/
 
 # macOS
 __MACOSX/
+
+# Local edit backups and LLM response cache (2026-10-10)
+*.bak-*
+*.bak.*
+*.bak
+backend/llm_cache/

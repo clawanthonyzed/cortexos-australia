@@ -5,7 +5,7 @@ import type { Agent, CreateAgentInput, UpdateAgentInput, AgentLog } from "@/type
 
 const AGENTS_KEY = "/agents";
 
-/** Matches AgentReadBrief from backend (list endpoint) */
+/** Matches AgentReadBrief from backend (list endpoint) — tags added when backend schema is updated */
 interface AgentBrief {
   id: string;
   name: string;
@@ -14,6 +14,10 @@ interface AgentBrief {
   model_provider: string;
   model_name: string;
   agent_type: string;
+  tags?: string[] | string; // Optional until backend AgentReadBrief includes it
+  role_tier?: string;
+  reporting_manager_id?: string | null;
+  venture_name?: string | null;
 }
 
 /** Matches AgentRead from backend (detail endpoint) */
@@ -23,7 +27,7 @@ interface AgentFull extends AgentBrief {
   max_tokens: number;
   config_json: Record<string, unknown>;
   system_prompt: string | null;
-  tags: string[];
+  tags: string[] | string;
   total_tokens_used: number;
   total_cost_usd: number;
   success_count: number;
@@ -52,6 +56,12 @@ interface AgentLogsResponse {
   total: number;
 }
 
+function parseTags(raw: string[] | string | undefined): string[] {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw;
+  try { return JSON.parse(raw); } catch { return []; }
+}
+
 function adaptBrief(b: AgentBrief): Agent {
   return {
     id: b.id,
@@ -64,8 +74,10 @@ function adaptBrief(b: AgentBrief): Agent {
     capabilities: [],
     currentTask: null,
     currentTaskId: null,
-    venture: null,
-    tags: [],
+    venture: b.venture_name ?? null,
+    roleTier: (b.role_tier as Agent["roleTier"]) ?? "worker",
+    reportingManagerId: b.reporting_manager_id ?? null,
+    tags: parseTags(b.tags),
     metrics: {
       successRate: 100,
       totalTasks: 0,
@@ -87,11 +99,7 @@ function adaptBrief(b: AgentBrief): Agent {
 function adaptFull(b: AgentFull): Agent {
   const totalTasks = b.success_count + b.error_count;
   const successRate = totalTasks > 0 ? (b.success_count / totalTasks) * 100 : 100;
-
-  let tags: string[] = [];
-  try {
-    tags = typeof b.tags === "string" ? JSON.parse(b.tags as string) : (b.tags ?? []);
-  } catch { tags = []; }
+  const tags = parseTags(b.tags);
 
   let config: Record<string, unknown> = {};
   try {
@@ -109,7 +117,9 @@ function adaptFull(b: AgentFull): Agent {
     capabilities: [],
     currentTask: null,
     currentTaskId: null,
-    venture: null,
+    venture: b.venture_name ?? null,
+    roleTier: (b.role_tier as Agent["roleTier"]) ?? "worker",
+    reportingManagerId: b.reporting_manager_id ?? null,
     tags,
     metrics: {
       successRate,
@@ -145,13 +155,14 @@ async function agentFetcher(url: string): Promise<Agent> {
 }
 
 export function useAgents(
-  params?: { status?: string; venture?: string; search?: string; page?: number },
+  params?: { status?: string; venture?: string; search?: string; page?: number; pageSize?: number },
   config?: SWRConfiguration
 ) {
   const searchParams = new URLSearchParams();
   if (params?.status && params.status !== "all") searchParams.set("status", params.status);
   if (params?.search) searchParams.set("search", params.search);
   if (params?.page) searchParams.set("page", String(params.page));
+  if (params?.pageSize) searchParams.set("page_size", String(params.pageSize));
 
   const key = `${AGENTS_KEY}?${searchParams.toString()}`;
 

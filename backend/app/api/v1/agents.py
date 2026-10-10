@@ -9,7 +9,7 @@ from typing import Any
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import StreamingResponse
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.executor import AgentExecutor
@@ -43,6 +43,8 @@ async def list_agents(
     pagination: dict = Depends(paginate),
     agent_type: str | None = Query(None),
     status_filter: str | None = Query(None, alias="status"),
+    venture_tag: str | None = Query(None, alias="venture"),
+    search: str | None = Query(None),
 ) -> dict[str, Any]:
     """List all agents with pagination."""
     stmt = select(Agent)
@@ -53,6 +55,10 @@ async def list_agents(
         stmt = stmt.where(Agent.agent_type == agent_type)
     if status_filter:
         stmt = stmt.where(Agent.status == status_filter)
+    if venture_tag:
+        stmt = stmt.where(Agent.tags.ilike(f"%{venture_tag}%"))
+    if search:
+        stmt = stmt.where(or_(Agent.name.ilike(f"%{search}%"), Agent.purpose.ilike(f"%{search}%")))
 
     count_stmt = select(func.count()).select_from(stmt.subquery())
     total = (await db.execute(count_stmt)).scalar_one()
@@ -61,8 +67,19 @@ async def list_agents(
     result = await db.execute(stmt)
     agents = result.scalars().all()
 
+    # venture_name was declared on the schema but never filled, so the org chart showed
+    # every manager as "(no venture)". Resolve all names in one query (2026-10-10).
+    from app.models.venture import Venture
+    vids = {a.venture_id for a in agents if a.venture_id}
+    vnames = dict((await db.execute(select(Venture.id, Venture.name).where(Venture.id.in_(vids)))).all()) if vids else {}
+
+    def _brief(a: Agent) -> dict[str, Any]:
+        d = AgentReadBrief.model_validate(a).model_dump(mode="json")
+        d["venture_name"] = vnames.get(a.venture_id)
+        return d
+
     return {
-        "items": [AgentReadBrief.model_validate(a) for a in agents],
+        "items": [_brief(a) for a in agents],
         "total": total,
         "page": pagination["page"],
         "page_size": pagination["page_size"],
@@ -101,6 +118,76 @@ async def create_agent(
     await db.flush()
     await db.refresh(agent)
     return AgentRead.model_validate(agent)
+
+
+@router.get("/{agent_id}/profile", response_model=dict[str, Any], tags=["agents"])
+async def get_agent_profile(
+    agent_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_permission(Permission.AGENT_READ)),
+) -> dict[str, Any]:
+    """Org-chart drawer: role, venture (+ its own description), tools, tasks, memory count,
+    and the agent's live .md instruction file (read-only mount /data/agents)."""
+    from pathlib import Path
+    from app.models.memory_item import MemoryItem
+    from app.models.task import Task
+    from app.models.venture import Venture
+
+    agent = await db.get(Agent, agent_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail=_error("Agent not found"))
+
+    venture = await db.get(Venture, agent.venture_id) if agent.venture_id else None
+    venture_desc = None
+    if venture:
+        base = Path("/opt/openclaw/business/config/workspace/production")
+        for cand in (base / venture.slug / "VENTURE.md", base / venture.slug / "CLAUDE.md"):
+            if cand.is_file():
+                lines = [l.strip() for l in cand.read_text(errors="replace").splitlines()]
+                body = [l for l in lines if l and not l.startswith(("#", "---", "|", ">"))]
+                venture_desc = " ".join(body[:3])[:600] or None
+                break
+
+    manager = await db.get(Agent, agent.reporting_manager_id) if agent.reporting_manager_id else None
+    reports = (await db.execute(
+        select(Agent.name).where(Agent.reporting_manager_id == agent.id).order_by(Agent.name)
+    )).scalars().all()
+    tasks = (await db.execute(
+        select(Task).where(Task.agent_id == agent.id).order_by(Task.created_at.desc()).limit(10)
+    )).scalars().all()
+    memory_count = (await db.execute(
+        select(func.count()).select_from(MemoryItem).where(MemoryItem.agent_id == agent.id)
+    )).scalar_one()
+
+    md_path = Path("/data/agents") / f"{agent.name}.md"
+    md_text = md_path.read_text(errors="replace") if md_path.is_file() else None
+
+    def _list(raw: str | None) -> list:
+        try:
+            v = json.loads(raw or "[]")
+            return v if isinstance(v, list) else [v]
+        except (ValueError, TypeError):
+            return [raw] if raw else []
+
+    return {
+        "id": str(agent.id),
+        "name": agent.name,
+        "role_tier": agent.role_tier,
+        "purpose": agent.purpose,
+        "description": agent.description,
+        "status": agent.status,
+        "model": agent.model_name,
+        "tags": _list(agent.tags),
+        "permitted_tools": _list(agent.permitted_tools),
+        "permitted_services": _list(agent.permitted_services),
+        "venture": {"name": venture.name, "slug": venture.slug, "manager": venture.manager_name,
+                    "status": venture.status, "description": venture_desc} if venture else None,
+        "reports_to": manager.name if manager else ("idea-lobster" if agent.role_tier in ("manager", "consultant") else None),
+        "direct_reports": list(reports),
+        "tasks": [{"id": str(t.id), "title": t.title, "status": t.status, "priority": t.priority} for t in tasks],
+        "memory_count": memory_count,
+        "md_file": {"path": f"/root/.claude/agents/{agent.name}.md", "content": md_text},
+    }
 
 
 @router.get("/{agent_id}", response_model=AgentRead, tags=["agents"])

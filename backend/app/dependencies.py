@@ -89,5 +89,5 @@ async def get_current_active_admin(
 def paginate(page: int = 1, page_size: int = 20) -> dict[str, int]:
     """Standard pagination dependency — returns offset and limit."""
     page = max(1, page)
-    page_size = min(max(1, page_size), 100)
+    page_size = min(max(1, page_size), 400)
     return {"offset": (page - 1) * page_size, "limit": page_size, "page": page, "page_size": page_size}

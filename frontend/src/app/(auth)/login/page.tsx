@@ -63,7 +63,7 @@ export default function LoginPage() {
             <Zap className="h-6 w-6 text-white" />
           </div>
           <div className="text-center">
-            <h1 className="text-2xl font-bold text-cortex-text tracking-tight">CortexOS</h1>
+            <h1 className="text-2xl font-bold text-cortex-text tracking-tight">EmpireOS</h1>
             <p className="text-cortex-muted mt-1 text-sm">Enter PIN to continue</p>
           </div>
         </div>
@@ -95,7 +95,7 @@ export default function LoginPage() {
         </div>
 
         <p className="text-center text-xs text-cortex-muted">
-          CortexOS Australia · Secure Access
+          EmpireOS Australia · Secure Access
         </p>
       </div>
     </div>

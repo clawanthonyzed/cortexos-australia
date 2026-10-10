@@ -132,7 +132,7 @@ export default function AgentDetailPage() {
             },
             {
               label: "Total Cost",
-              value: formatCurrency(agent.metrics.totalCostUsd, "USD"),
+              value: formatCurrency(agent.metrics.totalCostUsd, "AUD"),
               icon: DollarSign,
               color: "text-cortex-warning"
             },

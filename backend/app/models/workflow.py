@@ -1,5 +1,6 @@
 """Workflow and WorkflowStep models."""
 from __future__ import annotations
+from datetime import datetime
 
 import uuid
 from typing import TYPE_CHECKING
@@ -56,6 +57,12 @@ class Workflow(Base, UUIDMixin, TimestampMixin):
     run_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     success_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     failure_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    # Empire venture association
+    venture: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    tags: Mapped[str] = mapped_column(Text, nullable=False, default="[]", server_default="[]")
+    last_run_at: Mapped["datetime | None"] = mapped_column(nullable=True)
+    last_run_status: Mapped[str | None] = mapped_column(String(20), nullable=True)
 
     # Relationships
     steps: Mapped[list["WorkflowStep"]] = relationship(

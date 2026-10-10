@@ -84,6 +84,7 @@ class Settings(BaseSettings):
     mem0_use_local: bool = True  # Use local Qdrant when no API key
     mem0_ollama_url: str = "http://172.17.0.1:11434"  # Docker host Ollama
     mem0_embed_model: str = "nomic-embed-text"
+    mem0_llm_model: str = "llama3.2:3b"  # Local Ollama LLM for fact extraction - no Anthropic credit dependency
 
     # ── Knowledge Graph (Neo4j / Graphiti) ────────────────────────────────────
     graphiti_uri: str = "bolt://localhost:7687"

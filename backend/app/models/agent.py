@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base, TimestampMixin, UUIDMixin
@@ -62,6 +63,19 @@ class Agent(Base, UUIDMixin, TimestampMixin):
     # Classification
     agent_type: Mapped[str] = mapped_column(String(50), nullable=False, default="custom")
     tags: Mapped[str] = mapped_column(Text, nullable=False, default="[]", server_default="[]")
+
+    # Chain of command tier: owner, 2ic, consultant, manager, worker (added 0009)
+    role_tier: Mapped[str] = mapped_column(String(20), nullable=False, default="worker", server_default="worker")
+
+    # Governance registry (added 0006/0007)
+    reporting_manager_id: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("agents.id", ondelete="SET NULL"), nullable=True
+    )
+    repo_path: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    working_directory: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    permitted_tools: Mapped[str] = mapped_column(Text, nullable=False, default="[]", server_default="[]")
+    permitted_services: Mapped[str] = mapped_column(Text, nullable=False, default="[]", server_default="[]")
+    monthly_budget_usd: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     # Relationships
     tasks: Mapped[list["Task"]] = relationship("Task", back_populates="agent")

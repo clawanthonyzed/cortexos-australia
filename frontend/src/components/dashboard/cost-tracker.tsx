@@ -18,7 +18,7 @@ function CustomTooltip({ active, payload }: { active?: boolean; payload?: Array<
   return (
     <div className="rounded-lg border border-cortex-border bg-cortex-surface px-3 py-2 shadow-xl">
       <p className="text-xs font-medium text-cortex-text mb-1">{d.model}</p>
-      <p className="text-xs text-cortex-muted">{formatCurrency(d.costUsd, "USD")} · {formatTokens(d.tokensUsed)} tokens</p>
+      <p className="text-xs text-cortex-muted">{formatCurrency(d.costUsd, "AUD")} · {formatTokens(d.tokensUsed)} tokens</p>
       <p className="text-[11px] text-cortex-muted">{d.percentOfTotal.toFixed(1)}% of total spend</p>
     </div>
   );
@@ -66,7 +66,7 @@ export function CostTracker({ data, isLoading }: CostTrackerProps) {
           </ResponsiveContainer>
           <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
             <span className="text-sm font-bold font-mono text-cortex-text">
-              {formatCurrency(totalCost, "USD", true)}
+              {formatCurrency(totalCost, "AUD", true)}
             </span>
             <span className="text-[10px] text-cortex-muted">total</span>
           </div>
@@ -82,7 +82,7 @@ export function CostTracker({ data, isLoading }: CostTrackerProps) {
             />
             <span className="flex-1 text-xs text-cortex-muted truncate">{item.model}</span>
             <span className="font-mono text-xs text-cortex-text">
-              {formatCurrency(item.costUsd, "USD", true)}
+              {formatCurrency(item.costUsd, "AUD", true)}
             </span>
             <span className="font-mono text-[10px] text-cortex-muted w-8 text-right">
               {item.percentOfTotal.toFixed(0)}%

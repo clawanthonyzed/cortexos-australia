@@ -22,7 +22,7 @@ export function AppSidebar() {
         <SidebarMenuButton asChild>
           <a href="/dashboard">
             <LogoIcon />
-            <span className="font-semibold tracking-tight">CortexOS</span>
+            <span className="font-semibold tracking-tight">EmpireOS</span>
           </a>
         </SidebarMenuButton>
       </SidebarHeader>

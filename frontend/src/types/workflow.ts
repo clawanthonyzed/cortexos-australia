@@ -64,6 +64,7 @@ export interface Workflow {
   name: string;
   description: string;
   status: WorkflowStatus;
+  triggerType: string;
   venture: string | null;
   tags: string[];
   nodes: WorkflowNode[];

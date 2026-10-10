@@ -91,7 +91,7 @@ export function AgentStatusWidget({ agents, isLoading }: AgentStatusWidgetProps)
 
           <div className="flex items-center gap-2 flex-shrink-0">
             <span className="text-[10px] font-mono text-cortex-muted hidden sm:block">
-              {formatCurrency(agent.metrics.totalCostUsd, "USD", true)}
+              {formatCurrency(agent.metrics.totalCostUsd, "AUD", true)}
             </span>
             <Badge variant={statusBadgeVariant(agent.status)} className="text-[10px] py-0 px-1.5">
               {agent.status}

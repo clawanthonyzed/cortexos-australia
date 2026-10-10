@@ -33,11 +33,22 @@ class RoleRead(RoleBase):
 
     model_config = {"from_attributes": True}
 
+    @field_validator("permissions", mode="before")
+    @classmethod
+    def parse_permissions(cls, v):
+        if isinstance(v, str):
+            import json
+            try:
+                return json.loads(v)
+            except Exception:
+                return []
+        return v if v is not None else []
+
 
 # ── User schemas ──────────────────────────────────────────────────────────────
 
 class UserBase(BaseModel):
-    email: EmailStr
+    email: str
     username: str = Field(..., min_length=3, max_length=100, pattern=r"^[a-zA-Z0-9_-]+$")
     full_name: str | None = Field(None, max_length=255)
 
@@ -92,7 +103,11 @@ class PasswordChange(BaseModel):
 # ── Auth schemas ──────────────────────────────────────────────────────────────
 
 class LoginRequest(BaseModel):
-    email: EmailStr
+    # email is now optional -- a plain username (e.g. "anthony") is not valid
+    # EmailStr and was being hard-rejected before reaching the DB lookup.
+    # Exactly one of email/username must be given; the route enforces that.
+    email: EmailStr | None = None
+    username: str | None = None
     password: str
 
 

@@ -102,6 +102,20 @@ api.interceptors.response.use(
       }
     }
 
+    // A 403 with no stored access token means the request never carried
+    // credentials at all (FastAPI's HTTPBearer returns 403, not 401, for a
+    // missing Authorization header) -- the stale "isAuthenticated" flag in
+    // the persisted auth store survives independently of the real token, so
+    // the UI can otherwise render a signed-in shell with every call silently
+    // failing. Found 2026-10-08: org-chart (and /agents) showed all-zero
+    // counts with no visible error for exactly this reason.
+    if (error.response?.status === 403 && !getAccessToken()) {
+      clearTokens();
+      if (typeof window !== "undefined") {
+        window.location.href = "/login";
+      }
+    }
+
     return Promise.reject(error);
   }
 );

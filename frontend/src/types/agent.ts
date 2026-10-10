@@ -40,6 +40,8 @@ export interface Agent {
   currentTask: string | null;
   currentTaskId: string | null;
   venture: string | null;
+  roleTier: "owner" | "2ic" | "consultant" | "manager" | "worker";
+  reportingManagerId: string | null;
   tags: string[];
   metrics: AgentMetrics;
   memory: AgentMemory;

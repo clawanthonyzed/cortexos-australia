@@ -29,23 +29,34 @@ export default function AgentsPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<AgentStatus | "all">("all");
+  const [ventureFilter, setVentureFilter] = useState<string>("all");
 
   const { data, isLoading } = useAgents({
     search: search || undefined,
     status: statusFilter !== "all" ? statusFilter : undefined,
+    pageSize: 500, // was defaulting to the backend's 20 -- genuinely truncated at 20 of 338 with no pagination UI to see the rest
   });
 
   const agents = data?.agents ?? [];
 
+  // Derive unique venture slugs from tags
+  const allVentures = Array.from(
+    new Set(agents.flatMap((a) => a.tags).filter(Boolean))
+  ).sort();
+
+  const filteredAgents =
+    ventureFilter === "all"
+      ? agents
+      : agents.filter((a) => a.tags.includes(ventureFilter));
+
   return (
     <AppShell>
       <div className="space-y-5">
-        {/* Header */}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="page-title">Agents</h1>
             <p className="text-sm text-cortex-muted mt-0.5">
-              {isLoading ? "Loading..." : `${data?.total ?? 0} agents`}
+              {isLoading ? "Loading..." : `${filteredAgents.length} agents`}
             </p>
           </div>
           <Button onClick={() => setCreateOpen(true)}>
@@ -55,7 +66,7 @@ export default function AgentsPage() {
         </div>
 
         {/* Filters */}
-        <div className="flex gap-3">
+        <div className="flex gap-3 flex-wrap">
           <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-cortex-muted" />
             <Input
@@ -82,6 +93,19 @@ export default function AgentsPage() {
               <SelectItem value="stopped">Stopped</SelectItem>
             </SelectContent>
           </Select>
+          <Select value={ventureFilter} onValueChange={setVentureFilter}>
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="All ventures" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All ventures</SelectItem>
+              {allVentures.map((v) => (
+                <SelectItem key={v} value={v}>
+                  {v}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         {/* Grid */}
@@ -105,7 +129,7 @@ export default function AgentsPage() {
               </div>
             ))}
           </div>
-        ) : agents.length === 0 ? (
+        ) : filteredAgents.length === 0 ? (
           <EmptyState
             icon={Bot}
             title="No agents found"
@@ -122,14 +146,13 @@ export default function AgentsPage() {
           />
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {agents.map((agent) => (
+            {filteredAgents.map((agent) => (
               <AgentCard key={agent.id} agent={agent} />
             ))}
           </div>
         )}
       </div>
 
-      {/* Create dialog */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="max-w-xl">
           <DialogHeader>

@@ -1,6 +1,7 @@
 """Mem0 client wrapper for short and long-term agent memory."""
 from __future__ import annotations
 
+import json
 import uuid
 from typing import Any
 
@@ -9,6 +10,64 @@ import structlog
 from app.config import settings
 
 logger = structlog.get_logger(__name__)
+
+_ANTHROPIC_PATCHED = False
+
+
+def _patch_anthropic_llm() -> None:
+    # mem0ai==0.1.32's AnthropicLLM always sends both temperature and top_p.
+    # Current Anthropic models reject that combination (400: only one of
+    # temperature/top_p may be set). Drop top_p — deterministic fact
+    # extraction only needs temperature=0. Patched here rather than editing
+    # the vendored package so the fix survives image rebuilds. Safe to
+    # remove once mem0ai is upgraded past this bug.
+    global _ANTHROPIC_PATCHED
+    if _ANTHROPIC_PATCHED:
+        return
+    try:
+        from mem0.llms.anthropic import AnthropicLLM
+
+        def generate_response(self, messages, response_format=None, tools=None, tool_choice="auto"):
+            system_message = ""
+            filtered_messages = []
+            for message in messages:
+                if message["role"] == "system":
+                    system_message = message["content"]
+                else:
+                    filtered_messages.append(message)
+
+            params = {
+                "model": self.config.model,
+                "messages": filtered_messages,
+                "system": system_message,
+                "temperature": self.config.temperature,
+                "max_tokens": self.config.max_tokens,
+            }
+            if tools:
+                params["tools"] = tools
+                params["tool_choice"] = tool_choice
+
+            response = self.client.messages.create(**params)
+            text_out = response.content[0].text.strip()
+            # claude-haiku-4-5 often wraps JSON replies in markdown fences
+            # and/or appends trailing prose; mem0's json.loads() callers
+            # expect a bare JSON string with nothing else. Extract just the
+            # first complete JSON value and discard everything around it.
+            first_brace = text_out.find("{")
+            if first_brace != -1:
+                decoder = json.JSONDecoder()
+                try:
+                    _, end = decoder.raw_decode(text_out, first_brace)
+                    text_out = text_out[first_brace:end]
+                except (json.JSONDecodeError, ValueError):
+                    pass
+            return text_out
+
+        AnthropicLLM.generate_response = generate_response
+        _ANTHROPIC_PATCHED = True
+        logger.info("Patched mem0 AnthropicLLM to drop top_p (SPEC fix, mem0ai==0.1.32 bug)")
+    except ImportError:
+        pass
 
 
 class Mem0Client:
@@ -36,6 +95,7 @@ class Mem0Client:
             else:
                 # Local mode: Qdrant vector store + Ollama embeddings (no OpenAI key needed)
                 from mem0 import Memory  # type: ignore[import]
+                _patch_anthropic_llm()
                 mem0_config = {
                     "embedder": {
                         "provider": "ollama",

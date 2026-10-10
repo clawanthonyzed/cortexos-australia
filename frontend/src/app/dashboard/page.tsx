@@ -65,7 +65,7 @@ export default function DashboardPage() {
           />
           <StatCard
             title="Monthly Costs"
-            value={statsLoading ? "—" : formatCurrency(stats?.costsThisMonthUsd ?? 0, "USD", true)}
+            value={statsLoading ? "—" : formatCurrency(stats?.costsThisMonthUsd ?? 0, "AUD", true)}
             delta={stats?.costsGrowthPercent}
             deltaLabel="vs last month"
             icon={TrendingUp}

@@ -81,6 +81,7 @@ services:
     volumes:
       - ./backend:/app
       - /opt/openclaw:/opt/openclaw:ro
+      - /root/.claude/agents:/data/agents:ro
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
   celery:

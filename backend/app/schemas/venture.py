@@ -22,6 +22,12 @@ class VentureRead(VentureBase):
     id: uuid.UUID
     created_at: datetime
     updated_at: datetime
+    repo_url: str | None = None
+    parent_venture_id: uuid.UUID | None = None
+    monthly_budget_usd: float | None = None
+    target_revenue_monthly_usd: float | None = None
+    legacy_docs_path: str | None = None
+    status: str = "building"
 
     model_config = {"from_attributes": True}
 

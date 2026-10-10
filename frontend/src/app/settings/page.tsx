@@ -45,21 +45,21 @@ const LLM_PROVIDERS: APIKeyField[] = [
     label: "OpenAI",
     placeholder: "sk-...",
     envVar: "OPENAI_API_KEY",
-    connected: false,
+    connected: true,
   },
   {
     id: "google",
     label: "Google (Gemini)",
     placeholder: "AIza...",
     envVar: "GOOGLE_API_KEY",
-    connected: false,
+    connected: true,
   },
   {
     id: "openrouter",
     label: "OpenRouter",
     placeholder: "sk-or-...",
     envVar: "OPENROUTER_API_KEY",
-    connected: false,
+    connected: true,
   },
 ];
 
@@ -69,21 +69,21 @@ const INTEGRATIONS: APIKeyField[] = [
     label: "Etsy",
     placeholder: "Etsy API Key",
     envVar: "ETSY_API_KEY",
-    connected: false,
+    connected: true,
   },
   {
     id: "gumroad",
     label: "Gumroad",
     placeholder: "Access Token",
     envVar: "GUMROAD_ACCESS_TOKEN",
-    connected: false,
+    connected: true,
   },
   {
     id: "lemonsqueezy",
     label: "Lemon Squeezy",
     placeholder: "API Key",
     envVar: "LEMONSQUEEZY_API_KEY",
-    connected: false,
+    connected: true,
   },
   {
     id: "github",
@@ -160,7 +160,7 @@ export default function SettingsPage() {
             Settings
           </h1>
           <p className="text-sm text-cortex-muted mt-1">
-            Configure CortexOS — API keys, models, integrations, and system preferences.
+            Configure EmpireOS — API keys, models, integrations, and system preferences.
           </p>
         </div>
 

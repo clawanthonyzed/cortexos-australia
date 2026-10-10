@@ -42,7 +42,7 @@ function CustomTooltip({
           />
           <span className="text-cortex-muted capitalize">{entry.name}:</span>
           <span className="font-mono font-medium text-cortex-text">
-            {formatCurrency(entry.value, entry.name === "costs" ? "USD" : "AUD")}
+            {formatCurrency(entry.value, entry.name === "costs" ? "AUD" : "AUD")}
           </span>
         </div>
       ))}

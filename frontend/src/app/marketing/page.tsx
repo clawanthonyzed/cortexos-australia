@@ -1,63 +1,25 @@
 "use client";
 
 import useSWR from "swr";
-import { Plus, Megaphone, TrendingUp, Users, MousePointerClick, DollarSign } from "lucide-react";
+import { Megaphone, TrendingUp, DollarSign, BarChart3, RefreshCw } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { EmptyState } from "@/components/ui/empty-state";
 import { fetcher } from "@/lib/api";
-import { formatCurrency, formatRelativeTime, formatPercent } from "@/lib/utils";
-import { cn } from "@/lib/utils";
-
-interface Campaign {
-  id: string;
-  name: string;
-  type: "email" | "social" | "paid_ads" | "content" | "seo";
-  status: "active" | "paused" | "completed" | "draft";
-  venture: string;
-  platform: string;
-  budget: number;
-  spent: number;
-  impressions: number;
-  clicks: number;
-  conversions: number;
-  revenue: number;
-  startedAt: string;
-  endedAt: string | null;
-}
-
-const statusVariant = {
-  active: "success" as const,
-  paused: "warning" as const,
-  completed: "muted" as const,
-  draft: "muted" as const,
-};
-
-const typeIcon = {
-  email: "✉️",
-  social: "📱",
-  paid_ads: "💰",
-  content: "📝",
-  seo: "🔍",
-};
+import { formatCurrency } from "@/lib/utils";
+import { mutate } from "swr";
+import type { FinanceDashboard } from "@/types/finance";
 
 export default function MarketingPage() {
-  const { data, isLoading } = useSWR<{ campaigns: Campaign[]; total: number }>(
-    "/marketing/campaigns",
+  const { data: finance, isLoading } = useSWR<FinanceDashboard>(
+    "/finance",
     fetcher,
     { refreshInterval: 60000 }
   );
 
-  const campaigns = data?.campaigns ?? [];
-
-  const totalSpend = campaigns.reduce((s, c) => s + c.spent, 0);
-  const totalRevenue = campaigns.reduce((s, c) => s + c.revenue, 0);
-  const totalConversions = campaigns.reduce((s, c) => s + c.conversions, 0);
-  const avgCtr = campaigns.length > 0
-    ? campaigns.reduce((s, c) => s + (c.impressions > 0 ? c.clicks / c.impressions : 0), 0) / campaigns.length
-    : 0;
+  const byPlatform = finance?.revenue_by_platform ?? [];
+  const monthlyTrend = finance?.monthly_trend ?? [];
+  const recentMonths = monthlyTrend.slice(-3);
 
   return (
     <AppShell>
@@ -66,107 +28,118 @@ export default function MarketingPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="page-title">Marketing</h1>
-            <p className="text-sm text-cortex-muted mt-0.5">Campaigns and attribution</p>
+            <p className="text-sm text-cortex-muted mt-0.5">Revenue attribution by platform</p>
           </div>
-          <Button>
-            <Plus className="h-4 w-4" />
-            New Campaign
+          <Button variant="outline" size="sm" onClick={() => mutate("/finance")}>
+            <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+            Refresh
           </Button>
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {[
-            { label: "Total Spend", value: formatCurrency(totalSpend, "USD", true), icon: DollarSign, color: "text-cortex-warning" },
-            { label: "Attributed Revenue", value: formatCurrency(totalRevenue, "AUD", true), icon: TrendingUp, color: "text-cortex-success" },
-            { label: "Conversions", value: totalConversions.toLocaleString(), icon: Users, color: "text-cortex-accent" },
-            { label: "Avg CTR", value: formatPercent(avgCtr * 100, 2), icon: MousePointerClick, color: "text-cortex-muted" },
-          ].map((s) => (
-            <div key={s.label} className="cortex-card">
-              <div className="flex items-center gap-2 mb-1">
-                <s.icon className={cn("h-3.5 w-3.5", s.color)} />
-                <span className="text-xs text-cortex-muted">{s.label}</span>
+        {/* Summary stats */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {isLoading ? (
+            Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="cortex-card space-y-2">
+                <Skeleton className="h-3 w-20" />
+                <Skeleton className="h-6 w-28" />
               </div>
-              <p className="text-xl font-bold font-mono text-cortex-text">{s.value}</p>
-            </div>
-          ))}
+            ))
+          ) : (
+            <>
+              <div className="cortex-card">
+                <div className="flex items-center gap-2 mb-1">
+                  <DollarSign className="h-3.5 w-3.5 text-cortex-success" />
+                  <span className="text-xs text-cortex-muted">Total Revenue</span>
+                </div>
+                <p className="text-xl font-bold font-mono text-cortex-text">
+                  {formatCurrency(finance?.total_revenue_aud ?? 0, "AUD", true)}
+                </p>
+              </div>
+              <div className="cortex-card">
+                <div className="flex items-center gap-2 mb-1">
+                  <TrendingUp className="h-3.5 w-3.5 text-cortex-accent" />
+                  <span className="text-xs text-cortex-muted">Total Sales</span>
+                </div>
+                <p className="text-xl font-bold font-mono text-cortex-text">
+                  {(finance?.total_sales ?? 0).toLocaleString()}
+                </p>
+              </div>
+              <div className="cortex-card">
+                <div className="flex items-center gap-2 mb-1">
+                  <BarChart3 className="h-3.5 w-3.5 text-cortex-warning" />
+                  <span className="text-xs text-cortex-muted">Avg Order</span>
+                </div>
+                <p className="text-xl font-bold font-mono text-cortex-text">
+                  {formatCurrency(finance?.avg_order_value_aud ?? 0, "AUD", true)}
+                </p>
+              </div>
+            </>
+          )}
         </div>
 
-        {/* Campaigns table */}
-        {isLoading ? (
-          <div className="cortex-card space-y-3">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="flex gap-4">
-                <Skeleton className="h-4 flex-1" />
-                <Skeleton className="h-4 w-16" />
-                <Skeleton className="h-4 w-20" />
-                <Skeleton className="h-4 w-16" />
-              </div>
-            ))}
+        {/* Revenue by platform */}
+        <div className="cortex-card">
+          <div className="flex items-center gap-2 mb-4">
+            <Megaphone className="h-4 w-4 text-cortex-muted" />
+            <span className="text-sm font-semibold text-cortex-text">Revenue by Platform</span>
           </div>
-        ) : campaigns.length === 0 ? (
-          <EmptyState
-            icon={Megaphone}
-            title="No campaigns yet"
-            description="Create your first marketing campaign to track attribution and ROI"
-          />
-        ) : (
-          <div className="rounded-lg border border-cortex-border overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-cortex-bg/30 border-b border-cortex-border">
-                <tr>
-                  <th className="text-left px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-cortex-muted">Campaign</th>
-                  <th className="text-left px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-cortex-muted hidden sm:table-cell">Type</th>
-                  <th className="text-left px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-cortex-muted">Status</th>
-                  <th className="text-right px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-cortex-muted hidden md:table-cell">Impressions</th>
-                  <th className="text-right px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-cortex-muted hidden lg:table-cell">CTR</th>
-                  <th className="text-right px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-cortex-muted">Revenue</th>
-                  <th className="text-right px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-cortex-muted hidden md:table-cell">ROAS</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-cortex-border">
-                {campaigns.map((c) => {
-                  const ctr = c.impressions > 0 ? (c.clicks / c.impressions) * 100 : 0;
-                  const roas = c.spent > 0 ? c.revenue / c.spent : 0;
-                  return (
-                    <tr key={c.id} className="hover:bg-cortex-border/20 transition-colors cursor-pointer">
-                      <td className="px-4 py-3">
-                        <p className="font-medium text-cortex-text">{c.name}</p>
-                        <p className="text-[11px] text-cortex-muted">{c.venture} · {c.platform}</p>
-                      </td>
-                      <td className="px-4 py-3 hidden sm:table-cell">
-                        <span className="text-sm">{typeIcon[c.type] ?? "📊"}</span>
-                        <span className="ml-1 text-xs text-cortex-muted capitalize">{c.type.replace("_", " ")}</span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <Badge variant={statusVariant[c.status]} className="text-[10px] py-0 px-1.5">
-                          {c.status}
-                        </Badge>
-                      </td>
-                      <td className="px-4 py-3 text-right font-mono text-cortex-muted hidden md:table-cell text-xs">
-                        {c.impressions.toLocaleString()}
-                      </td>
-                      <td className="px-4 py-3 text-right font-mono text-cortex-muted hidden lg:table-cell text-xs">
-                        {formatPercent(ctr, 2)}
-                      </td>
-                      <td className="px-4 py-3 text-right font-mono text-cortex-success text-xs">
-                        {formatCurrency(c.revenue, "AUD", true)}
-                      </td>
-                      <td className="px-4 py-3 text-right hidden md:table-cell">
-                        <span className={cn(
-                          "text-xs font-mono font-semibold",
-                          roas >= 3 ? "text-cortex-success" :
-                          roas >= 1 ? "text-cortex-warning" :
-                          "text-cortex-error"
-                        )}>
-                          {roas.toFixed(2)}x
+          {isLoading ? (
+            <div className="space-y-3">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-4">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-4 flex-1" />
+                  <Skeleton className="h-4 w-16" />
+                </div>
+              ))}
+            </div>
+          ) : byPlatform.length === 0 ? (
+            <p className="text-sm text-cortex-muted py-4 text-center">No platform data yet. Connect Gumroad, Etsy, or LemonSqueezy in Settings.</p>
+          ) : (
+            <div className="space-y-3">
+              {byPlatform.map((p) => {
+                const maxRev = Math.max(...byPlatform.map((x) => x.revenue_aud), 1);
+                const pct = (p.revenue_aud / maxRev) * 100;
+                return (
+                  <div key={p.platform} className="space-y-1">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-cortex-text capitalize">{p.platform}</span>
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs text-cortex-muted">{p.sales_count} sales</span>
+                        <span className="font-mono font-semibold text-cortex-success text-sm">
+                          {formatCurrency(p.revenue_aud, "AUD", true)}
                         </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                      </div>
+                    </div>
+                    <div className="h-1.5 w-full rounded-full bg-cortex-border overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-cortex-success/60 transition-all duration-500"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Monthly trend */}
+        {recentMonths.length > 0 && (
+          <div className="cortex-card">
+            <p className="text-sm font-semibold text-cortex-text mb-4">Recent Monthly Trend</p>
+            <div className="grid grid-cols-3 gap-3">
+              {recentMonths.map((m) => (
+                <div key={m.month} className="rounded-lg bg-cortex-bg/30 p-3 text-center">
+                  <p className="text-xs text-cortex-muted mb-1">{m.month}</p>
+                  <p className="text-sm font-bold font-mono text-cortex-success">
+                    {formatCurrency(m.revenue_aud, "AUD", true)}
+                  </p>
+                  <p className="text-xs text-cortex-muted mt-0.5">{m.sales_count} sales</p>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
