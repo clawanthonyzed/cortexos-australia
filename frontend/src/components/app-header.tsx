@@ -8,7 +8,7 @@ import { AppBreadcrumbs } from "@/components/app-breadcrumbs";
 import { CustomSidebarTrigger } from "@/components/custom-sidebar-trigger";
 import { navLinks } from "@/components/app-shared";
 import { NavUser } from "@/components/nav-user";
-import { BellIcon, XIcon, NetworkIcon, ClipboardListIcon, WalletIcon, BookOpenIcon } from "lucide-react";
+import { BellIcon, XIcon, NetworkIcon, ClipboardListIcon, WalletIcon, BookOpenIcon, WrenchIcon } from "lucide-react";
 import Link from "next/link";
 import { useAgents } from "@/hooks/use-agents";
 import { apiClient } from "@/lib/api";
@@ -112,6 +112,13 @@ export function AppHeader() {
         >
           <BookOpenIcon className="h-3.5 w-3.5" />
           Second Brain
+        </Link>
+        <Link
+          href="/resources"
+          className="hidden md:flex items-center gap-1.5 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-xs font-medium text-cortex-text hover:bg-amber-500/20 transition-colors"
+        >
+          <WrenchIcon className="h-3.5 w-3.5" />
+          Resources
         </Link>
         <div className="relative">
           <Button

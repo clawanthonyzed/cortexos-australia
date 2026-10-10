@@ -14,6 +14,7 @@ from app.api.v1 import (
     logs,
     memory,
     second_brain,
+    resources,
     personal_assets,
     models,
     products,
@@ -39,6 +40,7 @@ api_router.include_router(ventures.router, prefix="/api/v1/ventures", tags=["ven
 # Memory & knowledge
 api_router.include_router(memory.router, prefix="/api/v1/memory", tags=["memory"])
 api_router.include_router(second_brain.router, prefix="/api/v1/second-brain", tags=["second-brain"])
+api_router.include_router(resources.router, prefix="/api/v1/resources", tags=["resources"])
 api_router.include_router(personal_assets.router, prefix="/api/v1/finance/assets", tags=["personal-assets"])
 api_router.include_router(knowledge_graph.router, prefix="/api/v1/knowledge-graph", tags=["knowledge_graph"])
 
