@@ -8,7 +8,7 @@ import { AppBreadcrumbs } from "@/components/app-breadcrumbs";
 import { CustomSidebarTrigger } from "@/components/custom-sidebar-trigger";
 import { navLinks } from "@/components/app-shared";
 import { NavUser } from "@/components/nav-user";
-import { BellIcon, XIcon, NetworkIcon, ClipboardListIcon, WalletIcon } from "lucide-react";
+import { BellIcon, XIcon, NetworkIcon, ClipboardListIcon, WalletIcon, BookOpenIcon } from "lucide-react";
 import Link from "next/link";
 import { useAgents } from "@/hooks/use-agents";
 import { apiClient } from "@/lib/api";
@@ -105,6 +105,13 @@ export function AppHeader() {
         >
           <WalletIcon className="h-3.5 w-3.5" />
           Finance
+        </Link>
+        <Link
+          href="/second-brain"
+          className="hidden md:flex items-center gap-1.5 rounded-md border border-violet-500/40 bg-violet-500/10 px-3 py-1.5 text-xs font-medium text-cortex-text hover:bg-violet-500/20 transition-colors"
+        >
+          <BookOpenIcon className="h-3.5 w-3.5" />
+          Second Brain
         </Link>
         <div className="relative">
           <Button

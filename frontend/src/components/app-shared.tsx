@@ -16,6 +16,7 @@ import {
   Building2Icon,
   ClipboardListIcon,
   WalletIcon,
+  BookOpenIcon,
 } from "lucide-react";
 
 export type SidebarNavItem = {
@@ -56,6 +57,11 @@ export const navGroups: SidebarNavGroup[] = [
         title: "Finance",
         path: "/finance",
         icon: <WalletIcon />,
+      },
+      {
+        title: "Second Brain",
+        path: "/second-brain",
+        icon: <BookOpenIcon />,
       },
     ],
   },

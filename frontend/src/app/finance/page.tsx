@@ -8,6 +8,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { RevenueBreakdown } from "@/components/finance/revenue-breakdown";
 import { CostBreakdown } from "@/components/finance/cost-breakdown";
 import { VentureBudgets } from "@/components/finance/venture-budgets";
+import { AssetLedger } from "@/components/finance/asset-ledger";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
@@ -155,6 +156,9 @@ export default function FinancePage() {
             )}
           </div>
         </div>
+
+        {/* Anthony personal wealth: 8 asset classes */}
+        <AssetLedger />
 
         {/* Spending Gate budgets per venture */}
         <VentureBudgets />
