@@ -25,7 +25,24 @@ from app.schemas.finance import (
 logger = structlog.get_logger(__name__)
 router = APIRouter()
 
-AUD_PER_USD = 1.55  # Approximate exchange rate
+AUD_PER_USD_FALLBACK = 1.55  # only used if the RBA rate file is missing
+FX_FILE = "/opt/openclaw/logs/fx_aud.json"  # written daily by sync_costs_to_cortexos.py (RBA rate)
+
+
+def _fx() -> dict:
+    import json as _json
+    try:
+        with open(FX_FILE) as f:
+            d = _json.load(f)
+        if float(d.get("aud_per_usd", 0)) > 0:
+            return d
+    except (OSError, ValueError):
+        pass
+    return {"aud_per_usd": AUD_PER_USD_FALLBACK, "as_of": None, "source": "fallback constant (RBA rate unavailable)"}
+
+
+def _aud_per_usd() -> float:
+    return float(_fx()["aud_per_usd"])
 
 
 def _period_to_days(period: str | None) -> int:
@@ -90,7 +107,7 @@ async def finance_dashboard(
     ]
     model_costs = sorted(token_usage, key=lambda t: t.cost_usd, reverse=True)
 
-    total_cost_aud = total_cost_usd * AUD_PER_USD
+    total_cost_aud = total_cost_usd * _aud_per_usd()
 
     # Product revenue
     products_result = await db.execute(
@@ -136,8 +153,8 @@ async def finance_dashboard(
         revenue_history.append(RevenueDataPoint(
             date=day_str,
             revenue=round(rev, 2),
-            costs=round(cost * AUD_PER_USD, 2),
-            profit=round(rev - cost * AUD_PER_USD, 2),
+            costs=round(cost * _aud_per_usd(), 2),
+            profit=round(rev - cost * _aud_per_usd(), 2),
         ))
 
     return FinanceDashboard(
@@ -213,7 +230,7 @@ async def monthly_summary(
         {
             "month": row.month,
             "cost_usd": float(row.cost_usd or 0),
-            "cost_aud": round(float(row.cost_usd or 0) * AUD_PER_USD, 2),
+            "cost_aud": round(float(row.cost_usd or 0) * _aud_per_usd(), 2),
             "tokens_used": int(row.tokens or 0),
         }
         for row in rows
@@ -284,6 +301,12 @@ async def trigger_revenue_sync(
     from app.integrations.gumroad import sync_gumroad_sales
     inserted = await sync_gumroad_sales(db, lookback_days=7)
     return {"inserted": inserted, "message": f"Synced {inserted} new revenue records from Gumroad"}
+
+
+@router.get("/fx", tags=["finance"])
+async def fx_rate(current_user: User = Depends(require_permission(Permission.FINANCE_READ))) -> dict[str, Any]:
+    """AUD per USD used for every conversion on the Finance page (Currency Law: AUD everywhere)."""
+    return _fx()
 
 
 @router.get("/budgets", tags=["finance"])

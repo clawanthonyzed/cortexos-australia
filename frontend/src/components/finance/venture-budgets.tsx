@@ -17,12 +17,14 @@ export function VentureBudgets() {
   const { data, isLoading } = useSWR<{ month: string | null; ventures: BudgetRow[] }>("/finance/budgets", fetcher, {
     refreshInterval: 60000,
   });
+  const { data: fx } = useSWR<{ aud_per_usd: number }>("/finance/fx", fetcher);
+  const r = fx?.aud_per_usd ?? 0;
 
   return (
     <div className="cortex-card">
       <div className="section-header">
         <h2 className="text-sm font-semibold text-cortex-text">AI spend vs budget by venture</h2>
-        <span className="text-xs text-cortex-muted">{data?.month ?? ""} · Spending Gate · USD</span>
+        <span className="text-xs text-cortex-muted">{data?.month ?? ""} · Spending Gate · AUD (limits set in US$, converted at RBA rate)</span>
       </div>
       {isLoading ? (
         <Skeleton className="h-40 w-full" />
@@ -36,7 +38,7 @@ export function VentureBudgets() {
                 <div className="flex items-baseline justify-between gap-3 text-sm">
                   <span className="text-cortex-text truncate">{v.name}</span>
                   <span className="font-mono text-xs text-cortex-muted tabular-nums shrink-0">
-                    ${v.spent_usd.toFixed(v.spent_usd < 0.01 ? 4 : 2)} / ${v.limit_usd.toFixed(0)} · {(v.percent ?? 0).toFixed(1)}%
+                    A${(v.spent_usd * r).toFixed(v.spent_usd * r < 0.01 ? 4 : 2)} / A${(v.limit_usd * r).toFixed(2)} · {(v.percent ?? 0).toFixed(1)}%
                   </span>
                 </div>
                 <div className="h-2 rounded-full bg-cortex-border overflow-hidden">

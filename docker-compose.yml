@@ -96,6 +96,7 @@ services:
     env_file:
       - .env
     environment:
+      CORTEXOS_DB_NULLPOOL: "1"
       DATABASE_URL: postgresql+asyncpg://cortexos:${POSTGRES_PASSWORD}@postgres:5432/cortexos
       REDIS_URL: redis://redis:6379/0
     volumes:
@@ -122,6 +123,7 @@ services:
     env_file:
       - .env
     environment:
+      CORTEXOS_DB_NULLPOOL: "1"
       DATABASE_URL: postgresql+asyncpg://cortexos:${POSTGRES_PASSWORD}@postgres:5432/cortexos
       REDIS_URL: redis://redis:6379/0
     volumes:

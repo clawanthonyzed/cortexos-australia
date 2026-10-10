@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import useSWR from "swr";
+import { fetcher } from "@/lib/api";
 import {
   DollarSign, TrendingUp, TrendingDown, Cpu, Target, ArrowUpRight, ArrowDownRight
 } from "lucide-react";
@@ -32,12 +34,15 @@ export default function FinancePage() {
   const { data, isLoading } = useFinance({ period });
 
   const totalRevenue = data?.total_revenue_aud ?? 0;
-  const totalCost = data?.total_cost_usd ?? 0;
+  // Currency Law (2026-10-10): AUD everywhere, converted at the RBA's daily rate
+  const { data: fx } = useSWR<{ aud_per_usd: number; as_of: string | null }>("/finance/fx", fetcher);
+  const audPerUsd = fx?.aud_per_usd ?? 0;
+  const totalCost = (data?.total_cost_usd ?? 0) * audPerUsd;
   const totalProfit = data?.total_profit_aud ?? 0;
   const totalTokensM = (data?.token_usage ?? []).reduce((s, t) => s + t.total_tokens, 0) / 1_000_000;
   const targetProgress = (totalRevenue / MONTHLY_TARGET) * 100;
 
-  const modelCosts = (data?.model_costs ?? []).map(tokenUsageToModelCost);
+  const modelCosts = (data?.model_costs ?? []).map(tokenUsageToModelCost).map((m) => ({ ...m, costUsd: m.costUsd * audPerUsd }));
 
   return (
     <AppShell>
@@ -46,7 +51,7 @@ export default function FinancePage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="page-title">Finance</h1>
-            <p className="text-sm text-cortex-muted mt-0.5">Revenue, costs, and projections</p>
+            <p className="text-sm text-cortex-muted mt-0.5">Revenue, costs, and projections · all figures AUD{fx ? ` (US$ costs converted at A$${fx.aud_per_usd.toFixed(4)}, RBA)` : ""}</p>
           </div>
           <Select value={period} onValueChange={(v) => setPeriod(v as typeof period)}>
             <SelectTrigger className="w-28">
@@ -71,7 +76,7 @@ export default function FinancePage() {
             },
             {
               label: "Costs (MTD)",
-              value: isLoading ? null : formatCurrency(totalCost, "USD"),
+              value: isLoading || !fx ? null : formatCurrency(totalCost, "AUD"),
               icon: TrendingUp,
             },
             {
@@ -183,7 +188,7 @@ export default function FinancePage() {
                   <tr>
                     <th className="text-left px-4 py-2 text-xs font-semibold uppercase tracking-wider text-cortex-muted">Model</th>
                     <th className="text-right px-4 py-2 text-xs font-semibold uppercase tracking-wider text-cortex-muted">Tokens</th>
-                    <th className="text-right px-4 py-2 text-xs font-semibold uppercase tracking-wider text-cortex-muted">Cost (USD)</th>
+                    <th className="text-right px-4 py-2 text-xs font-semibold uppercase tracking-wider text-cortex-muted">Cost (AUD)</th>
                     <th className="text-right px-4 py-2 text-xs font-semibold uppercase tracking-wider text-cortex-muted">% of Total</th>
                   </tr>
                 </thead>
@@ -194,7 +199,7 @@ export default function FinancePage() {
                         <span className="text-cortex-muted text-xs mr-1">{t.provider}/</span>{t.model}
                       </td>
                       <td className="px-4 py-2.5 text-right font-mono text-cortex-muted">{formatTokens(t.total_tokens)}</td>
-                      <td className="px-4 py-2.5 text-right font-mono text-cortex-text">{formatCurrency(t.cost_usd, "USD")}</td>
+                      <td className="px-4 py-2.5 text-right font-mono text-cortex-text">{formatCurrency(t.cost_usd * audPerUsd, "AUD")}</td>
                       <td className="px-4 py-2.5 text-right font-mono text-cortex-muted">{t.percent_of_total.toFixed(1)}%</td>
                     </tr>
                   ))}

@@ -30,6 +30,8 @@ export function AssetLedger() {
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState<Record<string, string>>(empty);
   const [saving, setSaving] = useState(false);
+  const [classFilter, setClassFilter] = useState<string | null>(null);
+  const [showAll, setShowAll] = useState(false);
   const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
   const startAdd = (cls?: string) => {
@@ -80,7 +82,7 @@ export function AssetLedger() {
           <h2 className="text-sm font-semibold text-cortex-text">Personal wealth: assets &amp; net worth</h2>
           <p className="text-xs text-cortex-muted mt-0.5">Your own figures only. Nothing here is estimated by an agent.</p>
         </div>
-        <Button size="sm" variant="outline" onClick={() => startAdd()}><Plus className="h-3.5 w-3.5" /> Add holding</Button>
+        <Button size="sm" variant="outline" onClick={() => startAdd(classFilter ?? undefined)}><Plus className="h-3.5 w-3.5" /> Add holding</Button>
       </div>
 
       {isLoading || !data ? (
@@ -96,25 +98,34 @@ export function AssetLedger() {
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
             {data.classes.map((c) => (
-              <button key={c.key} onClick={() => startAdd(c.key)}
-                      className="rounded-lg border border-cortex-border bg-cortex-bg/40 p-3 text-left hover:border-cortex-accent/50 transition-colors">
+              <button key={c.key} onClick={() => (c.holdings ? (setClassFilter(classFilter === c.key ? null : c.key), setShowAll(false)) : startAdd(c.key))}
+                      aria-pressed={classFilter === c.key}
+                      className={`rounded-lg border p-3 text-left transition-colors ${classFilter === c.key ? "border-cortex-accent bg-cortex-accent/10" : "border-cortex-border bg-cortex-bg/40 hover:border-cortex-accent/50"}`}>
                 <p className="text-xs text-cortex-muted">{c.icon} {c.label}</p>
                 <p className="mt-1 font-mono text-sm text-cortex-text tabular-nums">
                   {c.total_aud === null ? "—" : formatCurrency(c.total_aud, "AUD")}
                 </p>
-                <p className="text-[11px] text-cortex-muted">{c.holdings ? `${c.holdings} holding${c.holdings > 1 ? "s" : ""}` : "Tap to add"}</p>
+                <p className="text-[11px] text-cortex-muted">{c.holdings ? `${c.holdings} holding${c.holdings > 1 ? "s" : ""} · tap to view` : "Tap to add"}</p>
               </button>
             ))}
           </div>
-          {data.holdings.length > 0 && (
-            <div className="mt-4 overflow-x-auto rounded-lg border border-cortex-border">
+          {data.holdings.length > 0 && (() => {
+            const list = data.holdings.filter((h) => !classFilter || h.asset_class === classFilter)
+              .slice().sort((a, b) => (b.current_estimate_aud ?? 0) - (a.current_estimate_aud ?? 0));
+            const shown = showAll ? list : list.slice(0, 10);
+            return (<>
+            <div className="mt-4 flex items-center justify-between text-xs text-cortex-muted">
+              <span>{classFilter ? `${data.classes.find((c) => c.key === classFilter)?.label} · ${list.length} holdings` : `All holdings · ${list.length}`} · highest value first</span>
+              {classFilter && <button className="text-cortex-accent hover:underline" onClick={() => setClassFilter(null)}>Show all classes</button>}
+            </div>
+            <div className="mt-2 overflow-x-auto rounded-lg border border-cortex-border">
               <table className="w-full text-sm">
                 <thead className="bg-cortex-bg/30 text-xs uppercase tracking-wider text-cortex-muted">
                   <tr><th className="px-3 py-2 text-left">Holding</th><th className="px-3 py-2 text-left">Owner</th>
                     <th className="px-3 py-2 text-right">Bought</th><th className="px-3 py-2 text-right">Now</th><th /></tr>
                 </thead>
                 <tbody className="divide-y divide-cortex-border">
-                  {data.holdings.map((h) => (
+                  {shown.map((h) => (
                     <tr key={h.id}>
                       <td className="px-3 py-2 text-cortex-text">{h.name}<span className="block text-xs text-cortex-muted">{h.institution ?? ""}</span></td>
                       <td className="px-3 py-2 text-xs text-cortex-muted">{h.owner ?? "—"}</td>
@@ -129,7 +140,13 @@ export function AssetLedger() {
                 </tbody>
               </table>
             </div>
-          )}
+            {list.length > 10 && (
+              <button onClick={() => setShowAll(!showAll)} className="mt-2 text-xs text-cortex-accent hover:underline">
+                {showAll ? "Show top 10" : `Show all ${list.length}`}
+              </button>
+            )}
+            </>);
+          })()}
         </>
       )}
 

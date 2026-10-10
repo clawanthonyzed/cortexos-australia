@@ -1,6 +1,7 @@
 """Async SQLAlchemy engine, session factory, and base model."""
 from __future__ import annotations
 
+import os
 from collections.abc import AsyncGenerator
 from datetime import datetime, timezone
 from typing import Any
@@ -14,11 +15,19 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.pool import NullPool
 
 from app.config import settings
 
 
 def _make_engine() -> AsyncEngine:
+    # Celery runs every task in a brand-new event loop (asyncio.new_event_loop). Pooled asyncpg
+    # connections are bound to the loop that opened them, so each task left its connections
+    # stranded: 93 of Postgres's 100 slots were held by the worker on 2026-10-10 ("too many
+    # clients already"). Workers set CORTEXOS_DB_NULLPOOL=1: one connection per session,
+    # closed when the session closes. The web server keeps its normal pool.
+    if os.environ.get("CORTEXOS_DB_NULLPOOL") == "1":
+        return create_async_engine(settings.database_url, poolclass=NullPool, echo=settings.db_echo)
     return create_async_engine(
         settings.database_url,
         pool_size=settings.db_pool_size,
