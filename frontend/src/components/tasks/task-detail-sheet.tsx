@@ -28,6 +28,7 @@ export function TaskDetailSheet({ task, onClose }: { task: Task | null; onClose:
   const current = full ?? task;
   const done = current?.status === "completed";
   const running = current?.status === "running" || current?.status === "retrying";
+  const awaiting = current?.status === "awaiting_approval";
   const comments = ((full?.input as { comments?: TaskComment[] } | undefined)?.comments ?? []).slice().reverse();
   const venture = task?.title.match(/^\[([^\]]+)\]/)?.[1];
 
@@ -44,6 +45,21 @@ export function TaskDetailSheet({ task, onClose }: { task: Task | null; onClose:
       await apiClient.post(`/tasks/${task.id}/status`, { status: done ? "pending" : "completed" });
       await refresh();
       toast.success(done ? "Task reopened" : "Task marked done");
+    } catch {
+      toast.error("Couldn't update the task. Try again.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  // Human-in-the-Loop shield: nothing for Cudan Studio or GTT goes out until Anthony approves it here.
+  const decide = async (status: "completed" | "cancelled") => {
+    if (!task) return;
+    setBusy("status");
+    try {
+      await apiClient.post(`/tasks/${task.id}/status`, { status });
+      await refresh();
+      toast.success(status === "completed" ? "Approved" : "Rejected");
     } catch {
       toast.error("Couldn't update the task. Try again.");
     } finally {
@@ -80,6 +96,20 @@ export function TaskDetailSheet({ task, onClose }: { task: Task | null; onClose:
                 <User className="h-3.5 w-3.5" /> {task?.agentName ?? "Unassigned"} · created {formatRelativeTime(current.createdAt)}
               </SheetDescription>
             </SheetHeader>
+
+            {awaiting && (
+              <div className="rounded-lg border border-cortex-warning/40 bg-cortex-warning/10 p-3 space-y-2">
+                <p className="text-sm">Draft only. Nothing is posted or sent until you approve it.</p>
+                <div className="flex gap-2">
+                  <Button onClick={() => decide("completed")} disabled={busy !== null}>
+                    <CheckCircle2 className="h-4 w-4" /> Approve
+                  </Button>
+                  <Button variant="outline" onClick={() => decide("cancelled")} disabled={busy !== null}>
+                    Reject
+                  </Button>
+                </div>
+              </div>
+            )}
 
             <div className="flex items-center gap-3">
               <Button onClick={toggleDone} disabled={busy !== null || running} variant={done ? "outline" : "default"}>

@@ -120,6 +120,7 @@ export default function TasksPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All statuses</SelectItem>
+              <SelectItem value="awaiting_approval">Awaiting sign-off</SelectItem>
               <SelectItem value="queued">Queued</SelectItem>
               <SelectItem value="running">Running</SelectItem>
               <SelectItem value="completed">Completed</SelectItem>

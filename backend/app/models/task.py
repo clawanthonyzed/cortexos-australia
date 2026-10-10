@@ -24,6 +24,7 @@ class TaskStatus:
     FAILED = "failed"
     CANCELLED = "cancelled"
     RETRYING = "retrying"
+    AWAITING_APPROVAL = "awaiting_approval"  # Human-in-the-Loop shield (Cudan, GTT)
 
 
 class TaskPriority:

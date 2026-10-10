@@ -6,7 +6,8 @@ export type TaskStatus =
   | "failed"
   | "cancelled"
   | "paused"
-  | "retrying";
+  | "retrying"
+  | "awaiting_approval";
 
 export type TaskPriority = "low" | "normal" | "high" | "critical";
 

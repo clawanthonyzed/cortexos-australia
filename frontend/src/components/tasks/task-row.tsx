@@ -30,6 +30,7 @@ const statusConfig: Record<Task["status"], { icon: React.ElementType; color: str
   cancelled: { icon: StopCircle, color: "text-cortex-muted", label: "Cancelled" },
   paused: { icon: Pause, color: "text-cortex-warning", label: "Paused" },
   retrying: { icon: Loader2, color: "text-cortex-warning", label: "Retrying" },
+  awaiting_approval: { icon: Clock, color: "text-cortex-warning", label: "Awaiting your sign-off" },
 };
 
 const priorityVariant = {

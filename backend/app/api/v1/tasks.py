@@ -184,8 +184,8 @@ async def set_task_board_status(
     """Tick a task done (or reopen it) from the Tasks board. Never touches a running task."""
     from datetime import timezone
     new_status = str(payload.get("status", "")).lower()
-    if new_status not in (TaskStatus.COMPLETED, TaskStatus.PENDING):
-        raise HTTPException(status_code=422, detail=_error("status must be 'completed' or 'pending'"))
+    if new_status not in (TaskStatus.COMPLETED, TaskStatus.PENDING, TaskStatus.CANCELLED):
+        raise HTTPException(status_code=422, detail=_error("status must be 'completed', 'pending' or 'cancelled'"))
     task = await db.get(Task, task_id)
     if not task:
         raise HTTPException(status_code=404, detail=_error("Task not found"))
