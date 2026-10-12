@@ -1,7 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle2, Circle, Loader2, MessageSquarePlus, User } from "lucide-react";
+import { CheckCircle2, Circle, ClipboardCopy, ExternalLink, FileText, Loader2, MessageSquarePlus, User } from "lucide-react";
+import useSWR from "swr";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import { fetcher } from "@/lib/api";
 import { mutate } from "swr";
 import { toast } from "sonner";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -29,6 +33,16 @@ export function TaskDetailSheet({ task, onClose }: { task: Task | null; onClose:
   const done = current?.status === "completed";
   const running = current?.status === "running" || current?.status === "retrying";
   const awaiting = current?.status === "awaiting_approval";
+  // 2026-10-12: the finished work (draft) for this task, read from the Second Brain copy of the deliverable.
+  const hasDeliverable = !!(full?.output as { deliverable?: string } | null | undefined)?.deliverable;
+  const { data: work } = useSWR<{ url: string; text: string | null; model: string | null; note?: string }>(
+    task && (hasDeliverable || awaiting || done) ? `/tasks/${task.id}/deliverable` : null, fetcher, { shouldRetryOnError: false });
+  const copyWork = async () => {
+    if (!work?.text) return;
+    const plain = work.text.replace(/\*\*/g, "").replace(/^#+\s*/gm, "").trim();
+    try { await navigator.clipboard.writeText(plain); toast.success("Copied to clipboard"); }
+    catch { toast.error("Couldn't copy. Select the text and copy it manually."); }
+  };
   const comments = ((full?.input as { comments?: TaskComment[] } | undefined)?.comments ?? []).slice().reverse();
   const venture = task?.title.match(/^\[([^\]]+)\]/)?.[1];
 
@@ -97,9 +111,35 @@ export function TaskDetailSheet({ task, onClose }: { task: Task | null; onClose:
               </SheetDescription>
             </SheetHeader>
 
+            {work && (work.text || work.url) && (
+              <div className="rounded-lg border-2 border-cortex-accent/60 bg-cortex-surface p-4 space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="flex items-center gap-1.5 text-sm font-semibold text-cortex-text"><FileText className="h-4 w-4" /> Completed work</h3>
+                  <div className="flex items-center gap-2">
+                    {work.text && (
+                      <Button size="sm" variant="outline" onClick={copyWork} aria-label="Copy the completed work to the clipboard">
+                        <ClipboardCopy className="h-3.5 w-3.5" /> Copy
+                      </Button>
+                    )}
+                    <a href={work.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-cortex-muted hover:text-cortex-text">
+                      GitHub <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </div>
+                </div>
+                {work.text ? (
+                  <div className="prose prose-invert prose-sm max-w-none rounded-md bg-cortex-bg/60 p-3 text-cortex-text [&_p]:my-2 [&_strong]:text-cortex-text">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{work.text}</ReactMarkdown>
+                  </div>
+                ) : (
+                  <p className="text-sm text-cortex-muted">{work.note ?? "Open the GitHub link to read the draft."}</p>
+                )}
+                {work.model && <p className="text-[11px] text-cortex-muted">Written by {task?.agentName ?? "the agent"} on {work.model}</p>}
+              </div>
+            )}
+
             {awaiting && (
               <div className="rounded-lg border border-cortex-warning/40 bg-cortex-warning/10 p-3 space-y-2">
-                <p className="text-sm">Draft only. Nothing is posted or sent until you approve it.</p>
+                <p className="text-sm"><strong>Approve</strong> = you accept the completed work above as final. <strong>Reject</strong> = send it back. Nothing is posted or sent by EmpireOS either way; you publish it yourself.</p>
                 <div className="flex gap-2">
                   <Button onClick={() => decide("completed")} disabled={busy !== null}>
                     <CheckCircle2 className="h-4 w-4" /> Approve

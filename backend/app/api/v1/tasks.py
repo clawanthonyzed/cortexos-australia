@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from pathlib import Path
 import uuid
 from collections.abc import AsyncGenerator
 from datetime import datetime
@@ -172,6 +173,39 @@ async def task_stats(
         "avgDurationMs": round(avg_duration_ms, 2),
         "totalCostToday": 0.0,
     }
+
+
+THOUGHTS_ROOT = Path("/opt/openclaw/second-brain/inbox")
+
+
+@router.get("/{task_id}/deliverable", response_model=dict[str, Any], tags=["tasks"])
+async def get_task_deliverable(
+    task_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_permission(Permission.TASK_READ)),
+) -> dict[str, Any]:
+    """The finished work for a task (2026-10-12). Agent runs record a GitHub link to the draft in
+    result_json; the same file is in the read-only Second Brain mount, so return its Deliverable
+    section as text for the task drawer. Only files inside the vault inbox are ever read."""
+    task = await db.get(Task, task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail=_error("Task not found"))
+    url = _deliverable(task)
+    if not url:
+        raise HTTPException(status_code=404, detail=_error("No deliverable recorded for this task"))
+    name = url.rstrip("/").rsplit("/", 1)[-1]
+    candidates = [THOUGHTS_ROOT / "thoughts" / name, THOUGHTS_ROOT / name]
+    path = next((p for p in candidates if p.resolve().parent in (THOUGHTS_ROOT.resolve(), (THOUGHTS_ROOT / "thoughts").resolve()) and p.is_file()), None)
+    if path is None:
+        return {"url": url, "text": None, "model": None, "note": "Draft file not found on the server; open the link."}
+    raw = path.read_text(errors="replace")
+    model = None
+    for line in raw.splitlines()[:15]:
+        if line.startswith("| Model |"):
+            model = line.split("|")[2].strip()
+    body = raw.split("## Deliverable", 1)[1] if "## Deliverable" in raw else raw
+    body = body.split("\n## Next step for Anthony", 1)[0].strip()
+    return {"url": url, "text": body, "model": model}
 
 
 @router.post("/{task_id}/status", response_model=TaskRead, tags=["tasks"])
