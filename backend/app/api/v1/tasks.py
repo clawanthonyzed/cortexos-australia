@@ -43,6 +43,25 @@ def _deliverable(task: Task) -> str | None:
     return data.get("deliverable") if isinstance(data, dict) else None
 
 
+def _fix_pipe_tables(md: str) -> str:
+    """Free models often write '| Key | Value |' rows with no header/separator, which Markdown shows as plain text.
+    Insert a blank header + separator before any such block so it renders as a table."""
+    out, lines, i = [], md.splitlines(), 0
+    while i < len(lines):
+        line = lines[i]
+        if line.strip().startswith("|") and line.strip().endswith("|") and (i == 0 or not lines[i - 1].strip().startswith("|")):
+            nxt = lines[i + 1].strip() if i + 1 < len(lines) else ""
+            if not set(nxt.replace("|", "").replace(" ", "")) <= set("-:") or not nxt:
+                cols = max(1, line.strip().strip("|").count("|") + 1)
+                if out and out[-1].strip():
+                    out.append("")
+                out.append("|" + " |" * cols)
+                out.append("|" + "---|" * cols)
+        out.append(line)
+        i += 1
+    return "\n".join(out)
+
+
 def _task_read(task: Task) -> TaskRead:
     """TaskRead from a Task row. input_data/result_json are TEXT columns holding JSON, so
     model_validate(task) failed for every single-task response (found 2026-10-10)."""
@@ -205,7 +224,7 @@ async def get_task_deliverable(
             model = line.split("|")[2].strip()
     body = raw.split("## Deliverable", 1)[1] if "## Deliverable" in raw else raw
     body = body.split("\n## Next step for Anthony", 1)[0].strip()
-    return {"url": url, "text": body, "model": model}
+    return {"url": url, "text": _fix_pipe_tables(body), "model": model}
 
 
 @router.post("/{task_id}/status", response_model=TaskRead, tags=["tasks"])
